@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="120dp"
+    android:viewportWidth="200"
+    android:viewportHeight="120">
+    <!-- Widget Background Surface -->
+    <path
+        android:fillColor="#14161F"
+        android:pathData="M16,0 H184 A16,16 0 0,1 200,16 V104 A16,16 0 0,1 184,120 H16 A16,16 0 0,1 0,104 V16 A16,16 0 0,1 16,0 Z" />
+
+    <!-- Border Outline -->
+    <path
+        android:strokeColor="#262B3D"
+        android:strokeWidth="1.5"
+        android:pathData="M16,0 H184 A16,16 0 0,1 200,16 V104 A16,16 0 0,1 184,120 H16 A16,16 0 0,1 0,104 V16 A16,16 0 0,1 16,0 Z" />
+
+    <!-- Header Accent Dot -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M18,18 H28 A4,4 0 0,1 32,22 V22 A4,4 0 0,1 28,26 H18 A4,4 0 0,1 14,22 V22 A4,4 0 0,1 18,18 Z" />
+
+    <!-- Calorie Number Bar -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M16,42 H80 V56 H16 Z" />
+
+    <!-- Snap Button Placeholder -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M136,38 H184 A6,6 0 0,1 190,44 V52 A6,6 0 0,1 184,58 H136 A6,6 0 0,1 130,52 V44 A6,6 0 0,1 136,38 Z" />
+
+    <!-- Macro Stats Bar -->
+    <path
+        android:fillColor="#1D212E"
+        android:pathData="M16,80 H184 A8,8 0 0,1 192,88 V96 A8,8 0 0,1 184,104 H16 A8,8 0 0,1 8,96 V88 A8,8 0 0,1 16,80 Z" />
+
+    <!-- Macro Indicators -->
+    <path android:fillColor="#38BDF8" android:pathData="M24,90 H44 V94 H24 Z" />
+    <path android:fillColor="#FBBF24" android:pathData="M70,90 H90 V94 H70 Z" />
+    <path android:fillColor="#F43F5E" android:pathData="M116,90 H136 V94 H116 Z" />
+    <path android:fillColor="#06B6D4" android:pathData="M162,90 H182 V94 H162 Z" />
+</vector>

@@ -1,0 +1,360 @@
+package com.kalotracker.app.feature.meal
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CropFree
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import com.kalotracker.app.core.data.food.FoodCatalog
+import com.kalotracker.app.core.data.food.FoodCatalogItem
+import com.kalotracker.app.core.database.entity.FoodItemEntity
+import com.kalotracker.app.core.database.entity.MealEntity
+import com.kalotracker.app.core.designsystem.*
+import com.kalotracker.app.core.designsystem.components.KaloButton
+import java.util.UUID
+
+@Composable
+fun ManualMealScreen(
+    onClose: () -> Unit,
+    onSaveMeal: (MealEntity, List<FoodItemEntity>) -> Unit,
+    onScanBarcode: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    var mealTitle by remember { mutableStateOf("Manual Meal") }
+    val addedItems = remember { mutableStateListOf<FoodItemEntity>() }
+
+    val filteredCatalog = remember(searchQuery) {
+        FoodCatalog.search(searchQuery)
+    }
+
+    val totalCalories = addedItems.sumOf { it.calories }
+    val totalProtein = addedItems.map { it.protein }.sum()
+    val totalCarbs = addedItems.map { it.carbs }.sum()
+    val totalFat = addedItems.map { it.fat }.sum()
+
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        containerColor = KaloBackground,
+        topBar = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onClose,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(KaloSurfaceElevated)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close",
+                        tint = KaloTextPrimary
+                    )
+                }
+
+                Text(
+                    text = "MANUAL FOOD LOG",
+                    style = KaloTypography.labelSmall,
+                    color = KaloTextSecondary
+                )
+
+                Box(modifier = Modifier.size(40.dp))
+            }
+        },
+        bottomBar = {
+            if (addedItems.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(20.dp)
+                ) {
+                    KaloButton(
+                        text = "Log Meal ($totalCalories kcal)",
+                        onClick = {
+                            val mealId = UUID.randomUUID().toString()
+                            val meal = MealEntity(
+                                id = mealId,
+                                title = mealTitle.ifBlank { "Logged Meal" },
+                                totalCalories = totalCalories,
+                                totalProteinGrams = totalProtein,
+                                totalCarbsGrams = totalCarbs,
+                                totalFatGrams = totalFat
+                            )
+                            val itemsWithMealId = addedItems.map { it.copy(mealId = mealId) }
+                            onSaveMeal(meal, itemsWithMealId)
+                            onClose()
+                        }
+                    )
+                }
+            }
+        }
+    ) { paddingValues ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(bottom = 100.dp)
+        ) {
+            // Meal Title Input
+            item {
+                OutlinedTextField(
+                    value = mealTitle,
+                    onValueChange = { mealTitle = it },
+                    label = { Text("Meal Name", color = KaloTextSecondary) },
+                    textStyle = KaloTypography.headlineMedium.copy(color = KaloTextPrimary),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = KaloProtein,
+                        unfocusedBorderColor = KaloBorder,
+                        focusedContainerColor = KaloSurface,
+                        unfocusedContainerColor = KaloSurface
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
+                )
+            }
+
+            // Summary of Added Items
+            if (addedItems.isNotEmpty()) {
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(KaloSurfaceElevated, RoundedCornerShape(16.dp))
+                            .padding(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "CURRENT SELECTION",
+                                style = KaloTypography.labelSmall,
+                                color = KaloProtein
+                            )
+                            Text(
+                                text = "$totalCalories kcal",
+                                style = KaloTypography.titleMedium,
+                                color = KaloCalories
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "${totalProtein.toInt()}g P • ${totalCarbs.toInt()}g C • ${totalFat.toInt()}g F",
+                            style = KaloTypography.bodyMedium,
+                            color = KaloTextSecondary
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        addedItems.forEachIndexed { index, item ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "${item.name} (${item.portionGrams.toInt()}g)",
+                                    style = KaloTypography.bodyLarge,
+                                    color = KaloTextPrimary,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Text(
+                                    text = "${item.calories} kcal",
+                                    style = KaloTypography.bodyMedium,
+                                    color = KaloTextSecondary
+                                )
+                                IconButton(
+                                    onClick = { addedItems.removeAt(index) },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Remove",
+                                        tint = KaloFat,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Search Bar
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Search USDA food database...", color = KaloTextMuted) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = null,
+                                tint = KaloTextSecondary
+                            )
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = KaloProtein,
+                            unfocusedBorderColor = KaloBorder,
+                            focusedContainerColor = KaloSurface,
+                            unfocusedContainerColor = KaloSurface
+                        )
+                    )
+
+                    if (onScanBarcode != null) {
+                        IconButton(
+                            onClick = onScanBarcode,
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(KaloSurfaceElevated)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CropFree,
+                                contentDescription = "Scan Barcode",
+                                tint = KaloCarbs,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
+                Text(
+                    text = "COMMON FOODS (TAP TO ADD)",
+                    style = KaloTypography.labelSmall,
+                    color = KaloTextSecondary
+                )
+            }
+
+            // Catalog Items
+            items(filteredCatalog) { catalogItem ->
+                FoodCatalogRow(
+                    item = catalogItem,
+                    onAdd = { grams ->
+                        addedItems.add(
+                            FoodItemEntity(
+                                id = UUID.randomUUID().toString(),
+                                mealId = "",
+                                name = catalogItem.name,
+                                portionGrams = grams,
+                                calories = catalogItem.calculateCalories(grams),
+                                protein = catalogItem.calculateProtein(grams),
+                                carbs = catalogItem.calculateCarbs(grams),
+                                fat = catalogItem.calculateFat(grams)
+                            )
+                        )
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun FoodCatalogRow(
+    item: FoodCatalogItem,
+    onAdd: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var gramsText by remember { mutableStateOf(item.defaultServingGrams.toInt().toString()) }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(KaloSurface, RoundedCornerShape(14.dp))
+            .padding(14.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = item.name,
+                style = KaloTypography.titleMedium,
+                color = KaloTextPrimary
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "${item.caloriesPer100g.toInt()} kcal/100g • ${item.proteinPer100g.toInt()}g P • ${item.carbsPer100g.toInt()}g C • ${item.fatPer100g.toInt()}g F",
+                style = KaloTypography.bodyMedium,
+                color = KaloTextSecondary
+            )
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            OutlinedTextField(
+                value = gramsText,
+                onValueChange = { gramsText = it },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.width(68.dp),
+                textStyle = KaloTypography.bodyMedium.copy(color = KaloTextPrimary),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = KaloProtein,
+                    unfocusedBorderColor = KaloBorder
+                ),
+                shape = RoundedCornerShape(8.dp)
+            )
+
+            IconButton(
+                onClick = {
+                    val g = gramsText.toFloatOrNull() ?: item.defaultServingGrams
+                    onAdd(g)
+                },
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(KaloSurfaceElevated)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Add",
+                    tint = KaloProtein
+                )
+            }
+        }
+    }
+}

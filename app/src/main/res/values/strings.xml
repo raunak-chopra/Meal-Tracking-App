@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">Kalo</string>
+    <string name="health_connect_rationale">Kalo uses Health Connect to synchronize your daily steps and active calories from Google Fit or Samsung Health to compute your daily energy balance.</string>
+    <string name="title_dashboard">Today\'s Horizon</string>
+    <string name="title_settings">Settings &amp; Goals</string>
+    <string name="title_workout">Log Session</string>
+    <string name="title_manual_meal">Manual Food Log</string>
+    <string name="action_snap_meal">Snap Meal</string>
+    <string name="action_save_goals">Save Goals</string>
+    <string name="action_complete_workout">Complete Workout</string>
+    <string name="action_sign_in">Sign In</string>
+    <string name="action_create_account">Create Account</string>
+    <string name="action_continue_guest">Continue as Guest (Offline Mode)</string>
+    <string name="label_sync_now">Sync Now</string>
+    <string name="error_auth_generic">Authentication failed. Please check your credentials.</string>
+    <string name="widget_description">Glance at remaining calories, daily macros, and snap meals instantly from your home screen.</string>
+</resources>

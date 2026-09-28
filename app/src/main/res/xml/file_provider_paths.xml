@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Shares files from filesDir/meals/ (saved meal photos) -->
+    <files-path name="meal_images" path="meals/" />
+    <!-- Shares from cache if needed -->
+    <cache-path name="cache" path="." />
+</paths>
