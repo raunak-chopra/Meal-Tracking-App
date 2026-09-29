@@ -6,6 +6,10 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 android {
     namespace = "com.kalotracker.app"
     compileSdk = 35
@@ -47,6 +51,11 @@ android {
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
             "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi"
         )
+    }
+
+    sourceSets {
+        getByName("androidTest").assets.srcDir("$projectDir/schemas")
+        getByName("test").resources.srcDir("$projectDir/schemas")
     }
 
     buildFeatures {

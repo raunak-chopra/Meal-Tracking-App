@@ -22,7 +22,7 @@ import com.kalotracker.app.core.database.entity.WorkoutEntity
         WaterLogEntity::class
     ],
     version = 2,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class KaloDatabase : RoomDatabase() {
     abstract fun mealDao(): MealDao
