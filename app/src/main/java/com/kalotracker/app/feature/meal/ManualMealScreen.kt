@@ -24,7 +24,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.kalotracker.app.core.data.food.FoodCatalog
 import com.kalotracker.app.core.data.food.FoodCatalogItem
+import com.kalotracker.app.core.database.dao.MealWithItems
 import com.kalotracker.app.core.database.entity.FoodItemEntity
+import com.kalotracker.app.core.designsystem.components.DateTimeChip
 import com.kalotracker.app.core.database.entity.MealEntity
 import com.kalotracker.app.core.designsystem.*
 import com.kalotracker.app.core.designsystem.components.KaloButton
@@ -35,10 +37,13 @@ fun ManualMealScreen(
     onClose: () -> Unit,
     onSaveMeal: (MealEntity, List<FoodItemEntity>) -> Unit,
     onScanBarcode: (() -> Unit)? = null,
+    recentMeals: List<MealWithItems> = emptyList(),
+    onLogAgain: (MealWithItems, Long) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
+    var timestamp by remember { mutableStateOf(System.currentTimeMillis()) }
     var searchQuery by remember { mutableStateOf("") }
-    var mealTitle by remember { mutableStateOf("Manual Meal") }
+    var mealTitle by remember { mutableStateOf("") }
     val addedItems = remember { mutableStateListOf<FoodItemEntity>() }
 
     val filteredCatalog = remember(searchQuery) {
@@ -103,7 +108,8 @@ fun ManualMealScreen(
                                 totalCalories = totalCalories,
                                 totalProteinGrams = totalProtein,
                                 totalCarbsGrams = totalCarbs,
-                                totalFatGrams = totalFat
+                                totalFatGrams = totalFat,
+                                timestamp = timestamp
                             )
                             val itemsWithMealId = addedItems.map { it.copy(mealId = mealId) }
                             onSaveMeal(meal, itemsWithMealId)
@@ -127,7 +133,7 @@ fun ManualMealScreen(
                 OutlinedTextField(
                     value = mealTitle,
                     onValueChange = { mealTitle = it },
-                    label = { Text("Meal Name", color = KaloTextSecondary) },
+                    label = { Text("Meal name (optional)", color = KaloTextSecondary) },
                     textStyle = KaloTypography.headlineMedium.copy(color = KaloTextPrimary),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = KaloProtein,
@@ -138,6 +144,10 @@ fun ManualMealScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp)
                 )
+            }
+
+            item {
+                DateTimeChip(millis = timestamp, onChange = { timestamp = it })
             }
 
             // Summary of Added Items
@@ -221,7 +231,7 @@ fun ManualMealScreen(
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        placeholder = { Text("Search USDA food database...", color = KaloTextMuted) },
+                        placeholder = { Text("Search foods...", color = KaloTextMuted) },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.Search,
@@ -254,6 +264,41 @@ fun ManualMealScreen(
                                 modifier = Modifier.size(24.dp)
                             )
                         }
+                    }
+                }
+            }
+
+            if (searchQuery.isBlank() && recentMeals.isNotEmpty()) {
+                item {
+                    Text(
+                        text = "RECENT MEALS (TAP TO LOG AGAIN)",
+                        style = KaloTypography.labelSmall,
+                        color = KaloTextSecondary
+                    )
+                }
+                items(recentMeals, key = { "recent_" + it.meal.id }) { recent ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(KaloSurface)
+                            .clickable {
+                                onLogAgain(recent, timestamp)
+                                onClose()
+                            }
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(recent.meal.title, style = KaloTypography.titleMedium, color = KaloTextPrimary)
+                            Text(
+                                "${recent.meal.totalProteinGrams.toInt()}g P • ${recent.meal.totalCarbsGrams.toInt()}g C • ${recent.meal.totalFatGrams.toInt()}g F",
+                                style = KaloTypography.bodyMedium,
+                                color = KaloTextSecondary
+                            )
+                        }
+                        Text("${recent.meal.totalCalories} kcal", style = KaloTypography.bodyLarge, color = KaloCalories)
                     }
                 }
             }

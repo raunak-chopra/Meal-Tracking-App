@@ -8,7 +8,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CropFree
@@ -20,7 +23,11 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,81 +57,75 @@ fun DashboardScreen(
     onNavigateToWorkout: () -> Unit,
     onNavigateToHealthPermissions: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToEditMeal: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var fabOpen by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state.pendingUndo) {
+        val undo = state.pendingUndo ?: return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = undo.message,
+            actionLabel = "Undo",
+            duration = SnackbarDuration.Long
+        )
+        if (result == SnackbarResult.ActionPerformed) viewModel.undoDelete() else viewModel.dismissUndo()
+    }
     val dateFormatted = state.selectedDate.format(DateTimeFormatter.ofPattern("EEEE, MMM d"))
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = KaloBackground,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Quick Workout Trigger
-                FloatingActionButton(
-                    onClick = onNavigateToWorkout,
-                    containerColor = KaloSurfaceElevated,
-                    contentColor = KaloTextPrimary,
-                    shape = CircleShape,
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.FitnessCenter,
-                        contentDescription = "Log Workout",
-                        modifier = Modifier.size(22.dp)
-                    )
+                if (fabOpen) {
+                    QuickAction("Log workout", Icons.Default.FitnessCenter, KaloTextPrimary) {
+                        fabOpen = false; onNavigateToWorkout()
+                    }
+                    QuickAction("Add food manually", Icons.Default.Restaurant, KaloProtein) {
+                        fabOpen = false; onNavigateToManualMeal()
+                    }
+                    QuickAction("Scan barcode", Icons.Default.CropFree, KaloCarbs) {
+                        fabOpen = false; onNavigateToBarcode()
+                    }
                 }
-
-                // Quick Manual Food Trigger
-                FloatingActionButton(
-                    onClick = onNavigateToManualMeal,
-                    containerColor = KaloSurfaceElevated,
-                    contentColor = KaloProtein,
-                    shape = CircleShape,
-                    modifier = Modifier.size(48.dp)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Restaurant,
-                        contentDescription = "Manual Food",
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-
-                // Quick Barcode Scanner Trigger
-                FloatingActionButton(
-                    onClick = onNavigateToBarcode,
-                    containerColor = KaloSurfaceElevated,
-                    contentColor = KaloCarbs,
-                    shape = CircleShape,
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CropFree,
-                        contentDescription = "Scan Barcode",
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-
-                // Quick AI Meal Scan Trigger (Primary)
-                ExtendedFloatingActionButton(
-                    onClick = onNavigateToCamera,
-                    containerColor = KaloTextPrimary,
-                    contentColor = KaloBackground,
-                    shape = RoundedCornerShape(24.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CameraAlt,
-                        contentDescription = "Scan Meal",
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Snap Meal",
-                        style = KaloTypography.titleMedium
-                    )
+                    FloatingActionButton(
+                        onClick = { fabOpen = !fabOpen },
+                        containerColor = KaloSurfaceElevated,
+                        contentColor = KaloTextPrimary,
+                        shape = CircleShape,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (fabOpen) Icons.Default.Close else Icons.Default.Add,
+                            contentDescription = if (fabOpen) "Close menu" else "More ways to log",
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    ExtendedFloatingActionButton(
+                        onClick = { fabOpen = false; onNavigateToCamera() },
+                        containerColor = KaloTextPrimary,
+                        contentColor = KaloBackground,
+                        shape = RoundedCornerShape(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CameraAlt,
+                            contentDescription = "Scan Meal",
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "Snap Meal", style = KaloTypography.titleMedium)
+                    }
                 }
             }
         }
@@ -320,7 +321,9 @@ fun DashboardScreen(
             items(state.todayMeals) { mealWithItems ->
                 MealItemCard(
                     mealWithItems = mealWithItems,
-                    onDelete = { viewModel.deleteMeal(mealWithItems.meal) }
+                    onDelete = { viewModel.deleteMeal(mealWithItems) },
+                    onEdit = { onNavigateToEditMeal(mealWithItems.meal.id) },
+                    onLogAgain = { viewModel.logMealAgain(mealWithItems) }
                 )
             }
 
@@ -328,7 +331,7 @@ fun DashboardScreen(
             items(state.todayWorkouts) { workoutWithSets ->
                 WorkoutItemCard(
                     workoutWithSets = workoutWithSets,
-                    onDelete = { viewModel.deleteWorkout(workoutWithSets.workout) }
+                    onDelete = { viewModel.deleteWorkout(workoutWithSets) }
                 )
             }
         }
@@ -393,13 +396,20 @@ fun DailyInsightCard(
 fun MealItemCard(
     mealWithItems: MealWithItems,
     onDelete: () -> Unit,
+    onEdit: () -> Unit,
+    onLogAgain: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val meal = mealWithItems.meal
+    val timeText = java.time.Instant.ofEpochMilli(meal.timestamp)
+        .atZone(java.time.ZoneId.systemDefault())
+        .format(DateTimeFormatter.ofPattern("HH:mm"))
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(KaloSurface, RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(16.dp))
+            .background(KaloSurface)
+            .clickable(onClick = onEdit)
             .padding(16.dp)
     ) {
         Column {
@@ -436,11 +446,23 @@ fun MealItemCard(
                             color = KaloTextPrimary
                         )
                         Text(
-                            text = "${meal.totalCalories} kcal",
+                            text = "${meal.totalCalories} kcal  •  $timeText",
                             style = KaloTypography.bodyLarge,
                             color = KaloCalories
                         )
                     }
+                }
+
+                IconButton(
+                    onClick = onLogAgain,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ContentCopy,
+                        contentDescription = "Log this meal again",
+                        tint = KaloTextMuted,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
 
                 IconButton(
@@ -532,5 +554,24 @@ fun WorkoutItemCard(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun QuickAction(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tint: androidx.compose.ui.graphics.Color,
+    onClick: () -> Unit
+) {
+    ExtendedFloatingActionButton(
+        onClick = onClick,
+        containerColor = KaloSurfaceElevated,
+        contentColor = tint,
+        shape = RoundedCornerShape(20.dp)
+    ) {
+        Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(20.dp))
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(text = label, style = KaloTypography.titleMedium, color = KaloTextPrimary)
     }
 }

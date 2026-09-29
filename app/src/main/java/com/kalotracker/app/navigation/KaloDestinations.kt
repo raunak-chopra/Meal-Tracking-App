@@ -8,4 +8,7 @@ object KaloDestinations {
     const val HEALTH_PERMISSIONS = "health_permissions"
     const val SETTINGS = "settings"
     const val BARCODE_SCANNER = "barcode_scanner"
+    const val EDIT_MEAL = "edit_meal/{mealId}"
+
+    fun editMeal(mealId: String) = "edit_meal/$mealId"
 }

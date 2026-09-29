@@ -11,8 +11,6 @@ import com.kalotracker.app.core.data.repository.WaterRepository
 import com.kalotracker.app.core.data.repository.WorkoutRepository
 import com.kalotracker.app.core.database.dao.MealWithItems
 import com.kalotracker.app.core.database.dao.WorkoutWithSets
-import com.kalotracker.app.core.database.entity.MealEntity
-import com.kalotracker.app.core.database.entity.WorkoutEntity
 import com.kalotracker.app.core.health.HealthConnectManager
 import com.kalotracker.app.core.health.HealthDataSummary
 import kotlinx.coroutines.Job
@@ -23,6 +21,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
+
+sealed class UndoAction(val message: String) {
+    class Meal(val item: MealWithItems) : UndoAction("Deleted \"${item.meal.title}\"")
+    class Workout(val item: WorkoutWithSets) : UndoAction("Deleted \"${item.workout.title}\"")
+}
 
 data class DashboardUiState(
     val selectedDate: LocalDate = LocalDate.now(),
@@ -42,6 +45,7 @@ data class DashboardUiState(
     val todayMeals: List<MealWithItems> = emptyList(),
     val todayWorkouts: List<WorkoutWithSets> = emptyList(),
     val dailyInsight: NutritionInsight? = null,
+    val pendingUndo: UndoAction? = null,
     val isLoading: Boolean = false
 )
 
@@ -178,15 +182,45 @@ class DashboardViewModel(
         }
     }
 
-    fun deleteMeal(meal: MealEntity) {
+    fun deleteMeal(mealWithItems: MealWithItems) {
         viewModelScope.launch {
-            mealRepository.deleteMeal(meal)
+            mealRepository.deleteMeal(mealWithItems.meal)
+            _uiState.update { it.copy(pendingUndo = UndoAction.Meal(mealWithItems)) }
         }
     }
 
-    fun deleteWorkout(workout: WorkoutEntity) {
+    fun deleteWorkout(workoutWithSets: WorkoutWithSets) {
         viewModelScope.launch {
-            workoutRepository.deleteWorkout(workout)
+            workoutRepository.deleteWorkout(workoutWithSets.workout)
+            _uiState.update { it.copy(pendingUndo = UndoAction.Workout(workoutWithSets)) }
+        }
+    }
+
+    fun undoDelete() {
+        val action = _uiState.value.pendingUndo ?: return
+        _uiState.update { it.copy(pendingUndo = null) }
+        viewModelScope.launch {
+            when (action) {
+                is UndoAction.Meal -> mealRepository.restoreMeal(action.item)
+                is UndoAction.Workout -> workoutRepository.restoreWorkout(action.item)
+            }
+        }
+    }
+
+    fun dismissUndo() {
+        _uiState.update { it.copy(pendingUndo = null) }
+    }
+
+    /** Logs a copy of a meal on the day being viewed (now if today, otherwise noon of that day). */
+    fun logMealAgain(source: MealWithItems) {
+        viewModelScope.launch {
+            val s = _uiState.value
+            val timestamp = if (s.isToday) {
+                System.currentTimeMillis()
+            } else {
+                s.selectedDate.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            }
+            mealRepository.duplicateMeal(source, timestamp)
         }
     }
 

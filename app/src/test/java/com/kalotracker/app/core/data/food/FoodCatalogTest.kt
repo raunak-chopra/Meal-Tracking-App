@@ -10,7 +10,7 @@ class FoodCatalogTest {
     @Test
     fun testEmptySearchReturnsAllCatalogItems() {
         val allItems = FoodCatalog.search("")
-        assertTrue("Catalog should contain comprehensive staple items", allItems.size >= 20)
+        assertTrue("Catalog should contain comprehensive staple items", allItems.size >= 60)
     }
 
     @Test
@@ -26,6 +26,12 @@ class FoodCatalogTest {
         val lowercaseResults = FoodCatalog.search("salmon")
         assertEquals("Case should not affect search count", uppercaseResults.size, lowercaseResults.size)
         assertTrue("Should find Atlantic Salmon", uppercaseResults.any { it.name.contains("Salmon", ignoreCase = true) })
+    }
+
+    @Test
+    fun testCatalogIdsAreUnique() {
+        val ids = FoodCatalog.commonFoods.map { it.id }
+        assertEquals("Duplicate catalog ids", ids.size, ids.toSet().size)
     }
 
     @Test

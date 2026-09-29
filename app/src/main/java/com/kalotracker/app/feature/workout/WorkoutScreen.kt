@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.kalotracker.app.core.designsystem.*
+import com.kalotracker.app.core.designsystem.components.DateTimeChip
 import com.kalotracker.app.core.designsystem.components.KaloButton
 
 @Composable
@@ -165,6 +166,18 @@ fun WorkoutScreen(
                             )
                         }
                     }
+
+                    if (!state.overloadHint.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = state.overloadHint ?: "",
+                            style = KaloTypography.bodyMedium,
+                            color = KaloTextSecondary
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    DateTimeChip(millis = state.timestamp, onChange = { viewModel.setTimestamp(it) })
                 }
             }
 
@@ -193,7 +206,7 @@ fun WorkoutScreen(
                     OutlinedTextField(
                         value = state.estimatedCalories,
                         onValueChange = { viewModel.updateCalories(it) },
-                        label = { Text("Est. Burn (kcal)", color = KaloTextSecondary) },
+                        label = { Text("Burn estimate (kcal)", color = KaloTextSecondary) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         textStyle = KaloTypography.titleMedium.copy(color = KaloSteps),
                         modifier = Modifier.weight(1f),

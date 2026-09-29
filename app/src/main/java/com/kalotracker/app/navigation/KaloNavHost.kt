@@ -1,6 +1,8 @@
 package com.kalotracker.app.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -8,6 +10,12 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
+import com.kalotracker.app.core.database.dao.MealWithItems
+import com.kalotracker.app.feature.meal.EditMealScreen
+import com.kalotracker.app.feature.meal.EditMealViewModel
+import com.kalotracker.app.feature.meal.EditMealViewModelFactory
 import com.kalotracker.app.core.data.repository.MealRepository
 import com.kalotracker.app.core.data.repository.UserProfileRepository
 import com.kalotracker.app.core.data.repository.WaterRepository
@@ -73,7 +81,8 @@ fun KaloNavHost(
                 onNavigateToBarcode = { navController.navigate(KaloDestinations.BARCODE_SCANNER) },
                 onNavigateToWorkout = { navController.navigate(KaloDestinations.WORKOUT) },
                 onNavigateToHealthPermissions = { navController.navigate(KaloDestinations.HEALTH_PERMISSIONS) },
-                onNavigateToSettings = { navController.navigate(KaloDestinations.SETTINGS) }
+                onNavigateToSettings = { navController.navigate(KaloDestinations.SETTINGS) },
+                onNavigateToEditMeal = { id -> navController.navigate(KaloDestinations.editMeal(id)) }
             )
         }
 
@@ -90,8 +99,30 @@ fun KaloNavHost(
             )
         }
 
+        composable(
+            route = KaloDestinations.EDIT_MEAL,
+            arguments = listOf(navArgument("mealId") { type = NavType.StringType })
+        ) { entry ->
+            val mealId = entry.arguments?.getString("mealId").orEmpty()
+            val editViewModel: EditMealViewModel = viewModel(
+                key = "edit_$mealId",
+                factory = EditMealViewModelFactory(mealId, mealRepository)
+            )
+            EditMealScreen(
+                viewModel = editViewModel,
+                onClose = { navController.popBackStack() }
+            )
+        }
+
         composable(KaloDestinations.MANUAL_MEAL) {
+            val recentMeals by produceState(initialValue = emptyList<MealWithItems>()) {
+                value = mealRepository.getRecentDistinctMeals()
+            }
             ManualMealScreen(
+                recentMeals = recentMeals,
+                onLogAgain = { meal, time ->
+                    coroutineScope.launch { mealRepository.duplicateMeal(meal, time) }
+                },
                 onClose = { navController.popBackStack() },
                 onSaveMeal = { meal, items ->
                     coroutineScope.launch {
