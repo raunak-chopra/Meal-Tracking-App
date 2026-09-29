@@ -2,15 +2,9 @@ package com.kalotracker.app.core.data.repository
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.kalotracker.app.core.network.SupabaseModule
-import io.github.jan.supabase.auth.auth
-import io.github.jan.supabase.postgrest.from
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -22,16 +16,6 @@ data class UserProfile(
     @SerialName("daily_fat_target") val targetFat: Int = 70,
     @SerialName("daily_step_goal") val targetSteps: Long = 10000L,
     @SerialName("daily_water_target") val targetWaterMl: Int = 2500
-)
-
-@Serializable
-data class RemoteProfileUpsert(
-    val id: String,
-    val daily_calorie_target: Int,
-    val daily_protein_target: Int,
-    val daily_carbs_target: Int,
-    val daily_fat_target: Int,
-    val daily_step_goal: Long
 )
 
 enum class MacroPreset(val title: String, val proteinPct: Int, val carbsPct: Int, val fatPct: Int) {
@@ -87,9 +71,6 @@ class UserProfileRepository(context: Context) {
             .apply()
 
         _profile.value = updated
-
-        // Sync to Supabase in background if user is authenticated
-        syncProfileToRemote(updated)
     }
 
     fun applyPreset(preset: MacroPreset, totalCalories: Int) {
@@ -106,25 +87,5 @@ class UserProfileRepository(context: Context) {
             fat = fatGrams,
             steps = _profile.value.targetSteps
         )
-    }
-
-    private fun syncProfileToRemote(profile: UserProfile) {
-        if (!SupabaseModule.isConfigured) return
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val user = SupabaseModule.client.auth.currentUserOrNull() ?: return@launch
-                val remoteProfile = RemoteProfileUpsert(
-                    id = user.id,
-                    daily_calorie_target = profile.targetCalories,
-                    daily_protein_target = profile.targetProtein,
-                    daily_carbs_target = profile.targetCarbs,
-                    daily_fat_target = profile.targetFat,
-                    daily_step_goal = profile.targetSteps
-                )
-                SupabaseModule.client.from("profiles").upsert(remoteProfile)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
     }
 }

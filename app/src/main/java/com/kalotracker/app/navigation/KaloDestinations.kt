@@ -7,6 +7,5 @@ object KaloDestinations {
     const val WORKOUT = "workout"
     const val HEALTH_PERMISSIONS = "health_permissions"
     const val SETTINGS = "settings"
-    const val AUTH = "auth"
     const val BARCODE_SCANNER = "barcode_scanner"
 }

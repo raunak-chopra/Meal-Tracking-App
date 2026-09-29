@@ -8,15 +8,13 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.kalotracker.app.core.data.repository.AuthRepository
 import com.kalotracker.app.core.data.repository.MealRepository
 import com.kalotracker.app.core.data.repository.UserProfileRepository
 import com.kalotracker.app.core.data.repository.WaterRepository
 import com.kalotracker.app.core.data.repository.WorkoutRepository
 import com.kalotracker.app.core.health.HealthConnectManager
-import com.kalotracker.app.feature.auth.AuthScreen
-import com.kalotracker.app.feature.auth.AuthViewModel
-import com.kalotracker.app.feature.auth.AuthViewModelFactory
+import com.kalotracker.app.core.network.MealAnalysisService
+import com.kalotracker.app.core.settings.AppSettings
 import com.kalotracker.app.feature.barcode.BarcodeScannerScreen
 import com.kalotracker.app.feature.barcode.BarcodeScannerViewModel
 import com.kalotracker.app.feature.barcode.BarcodeScannerViewModelFactory
@@ -41,7 +39,8 @@ fun KaloNavHost(
     mealRepository: MealRepository,
     workoutRepository: WorkoutRepository,
     userProfileRepository: UserProfileRepository,
-    authRepository: AuthRepository,
+    appSettings: AppSettings,
+    analysisService: MealAnalysisService,
     waterRepository: WaterRepository,
     healthConnectManager: HealthConnectManager,
     onOpenHealthPermissions: () -> Unit,
@@ -80,13 +79,14 @@ fun KaloNavHost(
 
         composable(KaloDestinations.CAMERA) {
             val mealViewModel: MealViewModel = viewModel(
-                factory = MealViewModelFactory(mealRepository)
+                factory = MealViewModelFactory(mealRepository, analysisService)
             )
 
             CameraScreen(
                 viewModel = mealViewModel,
                 onClose = { navController.popBackStack() },
-                onMealSaved = { navController.popBackStack() }
+                onMealSaved = { navController.popBackStack() },
+                onOpenSettings = { navController.navigate(KaloDestinations.SETTINGS) }
             )
         }
 
@@ -118,16 +118,14 @@ fun KaloNavHost(
             val settingsViewModel: SettingsViewModel = viewModel(
                 factory = SettingsViewModelFactory(
                     userProfileRepository = userProfileRepository,
-                    mealRepository = mealRepository,
-                    workoutRepository = workoutRepository,
-                    authRepository = authRepository
+                    appSettings = appSettings,
+                    analysisService = analysisService
                 )
             )
 
             SettingsScreen(
                 viewModel = settingsViewModel,
-                onBack = { navController.popBackStack() },
-                onNavigateToAuth = { navController.navigate(KaloDestinations.AUTH) }
+                onBack = { navController.popBackStack() }
             )
         }
 
@@ -141,21 +139,6 @@ fun KaloNavHost(
             )
         }
 
-        composable(KaloDestinations.AUTH) {
-            val authViewModel: AuthViewModel = viewModel(
-                factory = AuthViewModelFactory(authRepository)
-            )
-
-            AuthScreen(
-                viewModel = authViewModel,
-                onAuthSuccess = {
-                    navController.navigate(KaloDestinations.DASHBOARD) {
-                        popUpTo(KaloDestinations.DASHBOARD) { inclusive = true }
-                    }
-                }
-            )
-        }
-
         composable(KaloDestinations.BARCODE_SCANNER) {
             val barcodeViewModel: BarcodeScannerViewModel = viewModel(
                 factory = BarcodeScannerViewModelFactory(mealRepository)
@@ -164,7 +147,12 @@ fun KaloNavHost(
             BarcodeScannerScreen(
                 viewModel = barcodeViewModel,
                 onClose = { navController.popBackStack() },
-                onMealSaved = { navController.popBackStack() }
+                onMealSaved = { navController.popBackStack() },
+                onEnterManually = {
+                    navController.navigate(KaloDestinations.MANUAL_MEAL) {
+                        popUpTo(KaloDestinations.BARCODE_SCANNER) { inclusive = true }
+                    }
+                }
             )
         }
     }

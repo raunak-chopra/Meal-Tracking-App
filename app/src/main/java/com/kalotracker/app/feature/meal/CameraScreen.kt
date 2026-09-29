@@ -43,6 +43,7 @@ fun CameraScreen(
     viewModel: MealViewModel,
     onClose: () -> Unit,
     onMealSaved: () -> Unit,
+    onOpenSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -58,6 +59,17 @@ fun CameraScreen(
         onDispose { cameraExecutor.shutdown() }
     }
 
+    var hasCameraPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, android.Manifest.permission.CAMERA) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted -> hasCameraPermission = granted }
+    var showFoodSearch by remember { mutableStateOf(false) }
+
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
@@ -68,7 +80,23 @@ fun CameraScreen(
 
     Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
         // CameraX Viewfinder
-        AndroidView(
+        if (!hasCameraPermission) {
+            Column(
+                modifier = Modifier.align(Alignment.Center).padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "Camera access is needed to photograph meals. You can still pick a photo from your gallery.",
+                    style = KaloTypography.bodyMedium,
+                    color = Color.White
+                )
+                Button(onClick = { permissionLauncher.launch(android.Manifest.permission.CAMERA) }) {
+                    Text("Allow camera")
+                }
+            }
+        }
+        if (hasCameraPermission) AndroidView(
             factory = { ctx ->
                 val previewView = PreviewView(ctx)
                 val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
@@ -147,15 +175,26 @@ fun CameraScreen(
             if (!state.errorMessage.isNullOrBlank()) {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = KaloFat.copy(alpha = 0.9f),
+                    color = KaloFat.copy(alpha = 0.92f),
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
                 ) {
-                    Text(
-                        text = state.errorMessage ?: "",
-                        style = KaloTypography.bodyMedium,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                        Text(
+                            text = state.errorMessage ?: "",
+                            style = KaloTypography.bodyMedium,
+                            color = Color.White
+                        )
+                        if (state.canRetry) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TextButton(onClick = { viewModel.retryAnalysis() }) {
+                                    Text("Retry", color = Color.White)
+                                }
+                                TextButton(onClick = onOpenSettings) {
+                                    Text("Settings", color = Color.White)
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -228,7 +267,7 @@ fun CameraScreen(
                                     }
 
                                     override fun onError(exception: ImageCaptureException) {
-                                        exception.printStackTrace()
+                                        viewModel.setError("Couldn't take the photo: ${exception.message}")
                                     }
                                 }
                             )
@@ -249,6 +288,13 @@ fun CameraScreen(
             }
         }
 
+        if (showFoodSearch) {
+            FoodSearchDialog(
+                onSelect = { viewModel.addCatalogItem(it) },
+                onDismiss = { showFoodSearch = false }
+            )
+        }
+
         // Meal Review Sheet when items are detected
         AnimatedVisibility(
             visible = state.items.isNotEmpty(),
@@ -257,9 +303,19 @@ fun CameraScreen(
         ) {
             MealReviewBottomSheet(
                 uiState = state,
-                onAdjustWeight = { id, mult -> viewModel.adjustItemWeight(id, mult) },
-                onSaveMeal = { viewModel.saveMeal(onMealSaved) },
-                onDismiss = onClose
+                actions = MealReviewActions(
+                    onTitleChange = viewModel::setMealTitle,
+                    onNameChange = viewModel::setItemName,
+                    onGramsChange = viewModel::setItemGrams,
+                    onRemoveItem = viewModel::removeItem,
+                    onAddFood = { showFoodSearch = true },
+                    onNoteChange = viewModel::setUserNote,
+                    onReanalyze = viewModel::retryAnalysis,
+                    onToggleOil = viewModel::toggleAddedOil,
+                    onTimeChange = viewModel::setTimestamp,
+                    onSave = { viewModel.saveMeal(onMealSaved) },
+                    onDiscard = { viewModel.resetScan() }
+                )
             )
         }
     }

@@ -6,11 +6,13 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.kalotracker.app.core.database.dao.MealDao
 import com.kalotracker.app.core.database.dao.WaterDao
+import com.kalotracker.app.core.database.dao.WeightDao
 import com.kalotracker.app.core.database.dao.WorkoutDao
 import com.kalotracker.app.core.database.entity.ExerciseSetEntity
 import com.kalotracker.app.core.database.entity.FoodItemEntity
 import com.kalotracker.app.core.database.entity.MealEntity
 import com.kalotracker.app.core.database.entity.WaterLogEntity
+import com.kalotracker.app.core.database.entity.WeightLogEntity
 import com.kalotracker.app.core.database.entity.WorkoutEntity
 
 @Database(
@@ -19,15 +21,17 @@ import com.kalotracker.app.core.database.entity.WorkoutEntity
         FoodItemEntity::class,
         WorkoutEntity::class,
         ExerciseSetEntity::class,
-        WaterLogEntity::class
+        WaterLogEntity::class,
+        WeightLogEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class KaloDatabase : RoomDatabase() {
     abstract fun mealDao(): MealDao
     abstract fun workoutDao(): WorkoutDao
     abstract fun waterDao(): WaterDao
+    abstract fun weightDao(): WeightDao
 
     companion object {
         @Volatile
@@ -35,11 +39,13 @@ abstract class KaloDatabase : RoomDatabase() {
 
         fun getInstance(context: Context): KaloDatabase {
             return INSTANCE ?: synchronized(this) {
+                // No destructive fallback: every schema change must ship a tested Migration,
+                // otherwise the app fails loudly instead of silently erasing the user's history.
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     KaloDatabase::class.java,
                     "kalo_database.db"
-                ).fallbackToDestructiveMigration().build()
+                ).addMigrations(*Migrations.ALL).build()
                 INSTANCE = instance
                 instance
             }

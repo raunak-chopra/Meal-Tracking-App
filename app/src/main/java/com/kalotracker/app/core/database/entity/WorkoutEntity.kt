@@ -14,8 +14,7 @@ data class WorkoutEntity(
     val type: String, // "STRENGTH", "CARDIO"
     val durationMinutes: Int = 0,
     val estimatedCaloriesBurned: Int = 0,
-    val timestamp: Long = System.currentTimeMillis(),
-    val syncStatus: String = "PENDING"
+    val timestamp: Long = System.currentTimeMillis()
 )
 
 @Entity(

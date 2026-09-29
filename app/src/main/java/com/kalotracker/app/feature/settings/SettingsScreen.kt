@@ -10,9 +10,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.CloudDone
-import androidx.compose.material.icons.filled.CloudSync
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -22,6 +19,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import com.kalotracker.app.core.data.repository.MacroPreset
 import com.kalotracker.app.core.designsystem.*
@@ -31,7 +33,6 @@ import com.kalotracker.app.core.designsystem.components.KaloButton
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     onBack: () -> Unit,
-    onNavigateToAuth: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -205,153 +206,8 @@ fun SettingsScreen(
                 }
             }
 
-            // Section: Cloud Sync
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(KaloSurface, RoundedCornerShape(16.dp))
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "SUPABASE CLOUD SYNC",
-                            style = KaloTypography.labelSmall,
-                            color = KaloTextSecondary
-                        )
-
-                        Text(
-                            text = if (state.isSupabaseConfigured) "Configured" else "Mock / Offline",
-                            style = KaloTypography.labelSmall,
-                            color = if (state.isSupabaseConfigured) KaloSteps else KaloCarbs
-                        )
-                    }
-
-                    Text(
-                        text = if (state.isSupabaseConfigured)
-                            "Your meals and workouts automatically sync to Postgres when online."
-                        else
-                            "Running in local-first offline mode. Set your Supabase URL & anon key in SupabaseModule to activate cloud sync.",
-                        style = KaloTypography.bodyMedium,
-                        color = KaloTextMuted
-                    )
-
-                    if (!state.syncMessage.isNullOrBlank()) {
-                        Text(
-                            text = state.syncMessage ?: "",
-                            style = KaloTypography.bodyMedium,
-                            color = KaloProtein
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    OutlinedButton(
-                        onClick = { viewModel.syncCloudNow() },
-                        enabled = !state.isSyncing,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = KaloTextPrimary
-                        ),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, KaloBorder)
-                    ) {
-                        Icon(
-                            imageVector = if (state.isSyncing) Icons.Default.CloudSync else Icons.Default.CloudDone,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (state.isSyncing) "Syncing..." else "Sync Now",
-                            style = KaloTypography.titleMedium
-                        )
-                    }
-                }
-            }
-
-            // Section: Account / Auth
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(KaloSurface, RoundedCornerShape(16.dp))
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = "ACCOUNT & SESSION",
-                        style = KaloTypography.labelSmall,
-                        color = KaloTextSecondary
-                    )
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(KaloSurfaceElevated),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = null,
-                                tint = KaloTextPrimary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
-                        Column {
-                            Text(
-                                text = if (state.isGuestMode) "Guest User (Offline Mode)" else (state.userEmail ?: "Signed In"),
-                                style = KaloTypography.titleMedium,
-                                color = KaloTextPrimary
-                            )
-                            Text(
-                                text = if (state.isGuestMode) "Sign in to backup data to the cloud" else "Authenticated with Supabase",
-                                style = KaloTypography.bodyMedium,
-                                color = KaloTextMuted
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    if (state.isGuestMode) {
-                        Button(
-                            onClick = onNavigateToAuth,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = KaloSurfaceElevated,
-                                contentColor = KaloProtein
-                            )
-                        ) {
-                            Text("Sign In or Register", style = KaloTypography.titleMedium)
-                        }
-                    } else {
-                        Button(
-                            onClick = { viewModel.signOut(onNavigateToAuth) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = KaloSurfaceElevated,
-                                contentColor = KaloFat
-                            )
-                        ) {
-                            Text("Sign Out", style = KaloTypography.titleMedium)
-                        }
-                    }
-                }
-            }
+            // Section: AI meal scanning (user's own Gemini key)
+            item { AiSettingsSection(state = state, viewModel = viewModel) }
         }
     }
 }
@@ -389,5 +245,84 @@ fun GoalInputField(
             ),
             shape = RoundedCornerShape(10.dp)
         )
+    }
+}
+
+@Composable
+fun AiSettingsSection(
+    state: SettingsUiState,
+    viewModel: SettingsViewModel,
+    modifier: Modifier = Modifier
+) {
+    var showKey by remember { mutableStateOf(false) }
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(KaloSurface, RoundedCornerShape(16.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = "AI MEAL SCANNING", style = KaloTypography.labelSmall, color = KaloTextSecondary)
+            Text(
+                text = if (state.aiConfigured) "Key saved" else "Not set up",
+                style = KaloTypography.labelSmall,
+                color = if (state.aiConfigured) KaloSteps else KaloCarbs
+            )
+        }
+
+        Text(
+            text = "Photo scanning uses your own Google Gemini API key (free tier available at aistudio.google.com). " +
+                "It is stored only on this phone. Without a key, photo scanning is off; barcode and manual logging still work.",
+            style = KaloTypography.bodyMedium,
+            color = KaloTextMuted
+        )
+
+        OutlinedTextField(
+            value = state.apiKeyInput,
+            onValueChange = { viewModel.updateApiKeyInput(it) },
+            label = { Text("Gemini API key") },
+            singleLine = true,
+            visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth(),
+            trailingIcon = {
+                TextButton(onClick = { showKey = !showKey }) { Text(if (showKey) "Hide" else "Show") }
+            }
+        )
+
+        OutlinedTextField(
+            value = state.modelInput,
+            onValueChange = { viewModel.updateModelInput(it) },
+            label = { Text("Model") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        if (!state.aiTestMessage.isNullOrBlank()) {
+            Text(
+                text = state.aiTestMessage ?: "",
+                style = KaloTypography.bodyMedium,
+                color = if (state.aiTestOk) KaloSteps else KaloFat
+            )
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedButton(
+                onClick = { viewModel.saveAndTestAi() },
+                enabled = !state.isTestingAi && state.apiKeyInput.isNotBlank(),
+                modifier = Modifier.weight(1f)
+            ) { Text(if (state.isTestingAi) "Testing..." else "Save & test") }
+
+            if (state.aiConfigured) {
+                OutlinedButton(
+                    onClick = { viewModel.clearAiKey() },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Remove key") }
+            }
+        }
     }
 }

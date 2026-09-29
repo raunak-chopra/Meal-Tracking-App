@@ -3,13 +3,12 @@ package com.kalotracker.app.feature.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.kalotracker.app.core.data.repository.AuthRepository
 import com.kalotracker.app.core.data.repository.MacroPreset
-import com.kalotracker.app.core.data.repository.MealRepository
 import com.kalotracker.app.core.data.repository.UserProfile
 import com.kalotracker.app.core.data.repository.UserProfileRepository
-import com.kalotracker.app.core.data.repository.WorkoutRepository
-import com.kalotracker.app.core.network.SupabaseModule
+import com.kalotracker.app.core.network.MealAnalysisService
+import com.kalotracker.app.core.settings.AiSettings
+import com.kalotracker.app.core.settings.AppSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,21 +23,27 @@ data class SettingsUiState(
     val fatInput: String = "70",
     val stepsInput: String = "10000",
     val waterInput: String = "2500",
-    val isSyncing: Boolean = false,
-    val syncMessage: String? = null,
-    val isSupabaseConfigured: Boolean = false,
-    val userEmail: String? = null,
-    val isGuestMode: Boolean = true
+    val apiKeyInput: String = "",
+    val modelInput: String = AppSettings.DEFAULT_MODEL,
+    val aiConfigured: Boolean = false,
+    val isTestingAi: Boolean = false,
+    val aiTestMessage: String? = null,
+    val aiTestOk: Boolean = false
 )
 
 class SettingsViewModel(
     private val userProfileRepository: UserProfileRepository,
-    private val mealRepository: MealRepository,
-    private val workoutRepository: WorkoutRepository,
-    private val authRepository: AuthRepository
+    private val appSettings: AppSettings,
+    private val analysisService: MealAnalysisService
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(SettingsUiState())
+    private val _uiState = MutableStateFlow(
+        SettingsUiState(
+            apiKeyInput = appSettings.ai.value.apiKey,
+            modelInput = appSettings.ai.value.model,
+            aiConfigured = appSettings.ai.value.isConfigured
+        )
+    )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
@@ -52,48 +57,21 @@ class SettingsViewModel(
                         carbsInput = profile.targetCarbs.toString(),
                         fatInput = profile.targetFat.toString(),
                         stepsInput = profile.targetSteps.toString(),
-                        waterInput = profile.targetWaterMl.toString(),
-                        isSupabaseConfigured = SupabaseModule.isConfigured
-                    )
-                }
-            }
-        }
-
-        viewModelScope.launch {
-            authRepository.authState.collect { auth ->
-                _uiState.update {
-                    it.copy(
-                        userEmail = auth.email,
-                        isGuestMode = auth.isGuestMode
+                        waterInput = profile.targetWaterMl.toString()
                     )
                 }
             }
         }
     }
 
-    fun updateCalorieInput(value: String) {
-        _uiState.update { it.copy(calorieInput = value) }
-    }
-
-    fun updateProteinInput(value: String) {
-        _uiState.update { it.copy(proteinInput = value) }
-    }
-
-    fun updateCarbsInput(value: String) {
-        _uiState.update { it.copy(carbsInput = value) }
-    }
-
-    fun updateFatInput(value: String) {
-        _uiState.update { it.copy(fatInput = value) }
-    }
-
-    fun updateStepsInput(value: String) {
-        _uiState.update { it.copy(stepsInput = value) }
-    }
-
-    fun updateWaterInput(value: String) {
-        _uiState.update { it.copy(waterInput = value) }
-    }
+    fun updateCalorieInput(value: String) = _uiState.update { it.copy(calorieInput = value) }
+    fun updateProteinInput(value: String) = _uiState.update { it.copy(proteinInput = value) }
+    fun updateCarbsInput(value: String) = _uiState.update { it.copy(carbsInput = value) }
+    fun updateFatInput(value: String) = _uiState.update { it.copy(fatInput = value) }
+    fun updateStepsInput(value: String) = _uiState.update { it.copy(stepsInput = value) }
+    fun updateWaterInput(value: String) = _uiState.update { it.copy(waterInput = value) }
+    fun updateApiKeyInput(value: String) = _uiState.update { it.copy(apiKeyInput = value, aiTestMessage = null) }
+    fun updateModelInput(value: String) = _uiState.update { it.copy(modelInput = value, aiTestMessage = null) }
 
     fun applyPreset(preset: MacroPreset) {
         val calories = _uiState.value.calorieInput.toIntOrNull() ?: 2200
@@ -101,60 +79,51 @@ class SettingsViewModel(
     }
 
     fun saveGoals() {
-        val calories = _uiState.value.calorieInput.toIntOrNull() ?: 2200
-        val protein = _uiState.value.proteinInput.toIntOrNull() ?: 160
-        val carbs = _uiState.value.carbsInput.toIntOrNull() ?: 220
-        val fat = _uiState.value.fatInput.toIntOrNull() ?: 70
-        val steps = _uiState.value.stepsInput.toLongOrNull() ?: 10000L
-        val water = _uiState.value.waterInput.toIntOrNull() ?: 2500
-
+        val s = _uiState.value
         userProfileRepository.updateTargets(
-            calories = calories,
-            protein = protein,
-            carbs = carbs,
-            fat = fat,
-            steps = steps,
-            waterMl = water
+            calories = s.calorieInput.toIntOrNull() ?: 2200,
+            protein = s.proteinInput.toIntOrNull() ?: 160,
+            carbs = s.carbsInput.toIntOrNull() ?: 220,
+            fat = s.fatInput.toIntOrNull() ?: 70,
+            steps = s.stepsInput.toLongOrNull() ?: 10000L,
+            waterMl = s.waterInput.toIntOrNull() ?: 2500
         )
     }
 
-    fun syncCloudNow() {
+    /** Saves the key/model, then makes a tiny request so a wrong key or model is caught right away. */
+    fun saveAndTestAi() {
+        val s = _uiState.value
+        val candidate = AiSettings(s.apiKeyInput.trim(), s.modelInput.trim().ifBlank { AppSettings.DEFAULT_MODEL })
+        appSettings.saveAi(candidate.apiKey, candidate.model)
+        _uiState.update { it.copy(isTestingAi = true, aiTestMessage = null, aiConfigured = candidate.isConfigured) }
         viewModelScope.launch {
-            _uiState.update { it.copy(isSyncing = true, syncMessage = null) }
-            val mealResult = mealRepository.syncPendingMeals()
-            val workoutResult = workoutRepository.syncPendingWorkouts()
-            val totalSynced = (mealResult.getOrElse { 0 }) + (workoutResult.getOrElse { 0 })
-            val hasError = mealResult.isFailure || workoutResult.isFailure
+            val result = analysisService.testConnection(candidate)
             _uiState.update {
                 it.copy(
-                    isSyncing = false,
-                    syncMessage = if (hasError)
-                        "Sync partially failed — check connection"
-                    else if (totalSynced > 0) "Successfully synced $totalSynced items"
-                    else "All items up to date"
+                    isTestingAi = false,
+                    aiTestOk = result.isSuccess,
+                    aiTestMessage = if (result.isSuccess) "Connected. Photo scanning is ready."
+                    else result.exceptionOrNull()?.localizedMessage ?: "Test failed"
                 )
             }
         }
     }
 
-    fun signOut(onSignedOut: () -> Unit) {
-        viewModelScope.launch {
-            authRepository.signOut()
-            onSignedOut()
-        }
+    fun clearAiKey() {
+        appSettings.saveAi("", _uiState.value.modelInput)
+        _uiState.update { it.copy(apiKeyInput = "", aiConfigured = false, aiTestMessage = null) }
     }
 }
 
 class SettingsViewModelFactory(
     private val userProfileRepository: UserProfileRepository,
-    private val mealRepository: MealRepository,
-    private val workoutRepository: WorkoutRepository,
-    private val authRepository: AuthRepository
+    private val appSettings: AppSettings,
+    private val analysisService: MealAnalysisService
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return SettingsViewModel(userProfileRepository, mealRepository, workoutRepository, authRepository) as T
+            return SettingsViewModel(userProfileRepository, appSettings, analysisService) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

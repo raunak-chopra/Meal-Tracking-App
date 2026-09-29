@@ -16,10 +16,8 @@ data class MealEntity(
     val totalCarbsGrams: Float,
     val totalFatGrams: Float,
     val imageLocalUri: String? = null,
-    val imageRemoteUrl: String? = null,
     val notes: String? = null,
-    val timestamp: Long = System.currentTimeMillis(),
-    val syncStatus: String = "PENDING" // "PENDING", "SYNCED"
+    val timestamp: Long = System.currentTimeMillis()
 )
 
 @Entity(

@@ -115,14 +115,6 @@ dependencies {
     // Image loading (Coil)
     implementation("io.coil-kt:coil-compose:2.7.0")
 
-    // Supabase Kotlin SDK
-    val supabaseVersion = "3.0.3"
-    implementation("io.github.jan-tennert.supabase:postgrest-kt:$supabaseVersion")
-    implementation("io.github.jan-tennert.supabase:storage-kt:$supabaseVersion")
-    implementation("io.github.jan-tennert.supabase:auth-kt:$supabaseVersion")
-    implementation("io.github.jan-tennert.supabase:functions-kt:$supabaseVersion")
-    implementation("io.ktor:ktor-client-android:3.0.3")
-
     // Kotlinx Serialization & Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
@@ -134,5 +126,7 @@ dependencies {
 
     // Unit Testing
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.xerial:sqlite-jdbc:3.46.1.0")
+    testImplementation("org.json:json:20240303")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
 }
