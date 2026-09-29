@@ -1,6 +1,13 @@
 package com.kalotracker.app.feature.settings
 
+import android.content.ContentResolver
+import android.net.Uri
 import androidx.lifecycle.ViewModel
+import com.kalotracker.app.core.data.backup.BackupCodec
+import com.kalotracker.app.core.data.backup.BackupManager
+import com.kalotracker.app.core.data.backup.ImportSummary
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.kalotracker.app.core.ai.GoalType
@@ -32,13 +39,17 @@ data class SettingsUiState(
     val aiTestMessage: String? = null,
     val aiTestOk: Boolean = false,
     val goal: GoalType = GoalType.MAINTAIN,
-    val reminder: ReminderSettings = ReminderSettings()
+    val reminder: ReminderSettings = ReminderSettings(),
+    val dataBusy: Boolean = false,
+    val dataMessage: String? = null,
+    val dataOk: Boolean = false
 )
 
 class SettingsViewModel(
     private val userProfileRepository: UserProfileRepository,
     private val appSettings: AppSettings,
     private val analysisService: MealAnalysisService,
+    private val backupManager: BackupManager,
     private val scheduleReminder: (ReminderSettings) -> Unit
 ) : ViewModel() {
 
@@ -131,6 +142,62 @@ class SettingsViewModel(
         }
     }
 
+    private fun runData(successMessage: (Any?) -> String, block: suspend () -> Any?) {
+        if (_uiState.value.dataBusy) return
+        _uiState.update { it.copy(dataBusy = true, dataMessage = null) }
+        viewModelScope.launch {
+            val result = runCatching { block() }
+            _uiState.update {
+                it.copy(
+                    dataBusy = false,
+                    dataOk = result.isSuccess,
+                    dataMessage = result.fold(
+                        onSuccess = { value -> successMessage(value) },
+                        onFailure = { e -> e.localizedMessage ?: "Something went wrong." }
+                    )
+                )
+            }
+        }
+    }
+
+    fun exportBackup(uri: Uri, resolver: ContentResolver) = runData(
+        successMessage = { "Backup saved (${it as Int} entries). Photos are not included." }
+    ) {
+        val backup = backupManager.buildBackup()
+        writeText(resolver, uri, BackupCodec.encode(backup))
+        backup.meals.size + backup.workouts.size + backup.water.size + backup.weights.size
+    }
+
+    fun exportMealsCsv(uri: Uri, resolver: ContentResolver) = runData(
+        successMessage = { "Exported ${it as Int} meals to CSV." }
+    ) {
+        val backup = backupManager.buildBackup()
+        writeText(resolver, uri, BackupCodec.mealsToCsv(backup.meals))
+        backup.meals.size
+    }
+
+    fun importBackup(uri: Uri, resolver: ContentResolver) = runData(
+        successMessage = {
+            val r = it as ImportSummary
+            "Imported ${r.meals} meals, ${r.workouts} workouts, ${r.water} water and ${r.weights} weight entries."
+        }
+    ) {
+        val text = withContext(Dispatchers.IO) {
+            resolver.openInputStream(uri)?.bufferedReader()?.use { reader -> reader.readText() }
+                ?: throw java.io.IOException("Couldn't open that file.")
+        }
+        backupManager.import(BackupCodec.decode(text))
+    }
+
+    fun deleteAllData() = runData(successMessage = { "All logs and photos were deleted." }) {
+        backupManager.deleteAllData()
+    }
+
+    private suspend fun writeText(resolver: ContentResolver, uri: Uri, text: String) = withContext(Dispatchers.IO) {
+        resolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use { it.write(text) }
+            ?: throw java.io.IOException("Couldn't write to that location.")
+    }
+
     fun clearAiKey() {
         appSettings.saveAi("", _uiState.value.modelInput)
         _uiState.update { it.copy(apiKeyInput = "", aiConfigured = false, aiTestMessage = null) }
@@ -141,12 +208,13 @@ class SettingsViewModelFactory(
     private val userProfileRepository: UserProfileRepository,
     private val appSettings: AppSettings,
     private val analysisService: MealAnalysisService,
+    private val backupManager: BackupManager,
     private val scheduleReminder: (ReminderSettings) -> Unit
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return SettingsViewModel(userProfileRepository, appSettings, analysisService, scheduleReminder) as T
+            return SettingsViewModel(userProfileRepository, appSettings, analysisService, backupManager, scheduleReminder) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

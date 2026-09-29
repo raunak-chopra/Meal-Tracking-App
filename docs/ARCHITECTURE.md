@@ -1,3 +1,5 @@
+> **Note:** This is the original design. The app is now local-only: Supabase, accounts and cloud sync were removed, and AI scanning calls the Gemini API directly with the user's own key. See the README for the current structure.
+
 # Kalo — Architecture & Technical Reference
 
 ## 1. System Overview

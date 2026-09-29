@@ -2,7 +2,10 @@ package com.kalotracker.app.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -18,6 +21,7 @@ import com.kalotracker.app.feature.meal.EditMealViewModel
 import com.kalotracker.app.feature.meal.EditMealViewModelFactory
 import com.kalotracker.app.core.data.repository.MealRepository
 import com.kalotracker.app.core.data.repository.UserProfileRepository
+import com.kalotracker.app.core.data.backup.BackupManager
 import com.kalotracker.app.core.data.repository.WaterRepository
 import com.kalotracker.app.core.data.repository.WeightRepository
 import com.kalotracker.app.core.reminder.ReminderScheduler
@@ -57,6 +61,7 @@ fun KaloNavHost(
     analysisService: MealAnalysisService,
     waterRepository: WaterRepository,
     weightRepository: WeightRepository,
+    backupManager: BackupManager,
     healthConnectManager: HealthConnectManager,
     onOpenHealthPermissions: () -> Unit,
     modifier: Modifier = Modifier,
@@ -124,9 +129,8 @@ fun KaloNavHost(
         }
 
         composable(KaloDestinations.MANUAL_MEAL) {
-            val recentMeals by produceState(initialValue = emptyList<MealWithItems>()) {
-                value = mealRepository.getRecentDistinctMeals()
-            }
+            var recentMeals by remember { mutableStateOf(emptyList<MealWithItems>()) }
+            LaunchedEffect(Unit) { recentMeals = mealRepository.getRecentDistinctMeals() }
             ManualMealScreen(
                 recentMeals = recentMeals,
                 onLogAgain = { meal, time ->
@@ -179,6 +183,7 @@ fun KaloNavHost(
                     userProfileRepository = userProfileRepository,
                     appSettings = appSettings,
                     analysisService = analysisService,
+                    backupManager = backupManager,
                     scheduleReminder = { ReminderScheduler.schedule(appContext, it, replace = true) }
                 )
             )

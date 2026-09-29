@@ -119,7 +119,7 @@ fun BarcodeScannerScreen(
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
-                }, ctx.mainExecutor)
+                }, androidx.core.content.ContextCompat.getMainExecutor(ctx))
 
                 previewView
             },

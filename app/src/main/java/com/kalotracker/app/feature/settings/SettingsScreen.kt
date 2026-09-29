@@ -210,6 +210,8 @@ fun SettingsScreen(
 
             item { ReminderSection(state = state, viewModel = viewModel) }
 
+            item { DataSection(state = state, viewModel = viewModel) }
+
             // Section: AI meal scanning (user's own Gemini key)
             item { AiSettingsSection(state = state, viewModel = viewModel) }
         }
@@ -415,6 +417,88 @@ private fun ReminderSection(state: SettingsUiState, viewModel: SettingsViewModel
             },
             dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("Cancel") } },
             text = { TimePicker(state = timeState) }
+        )
+    }
+}
+
+@Composable
+private fun DataSection(state: SettingsUiState, viewModel: SettingsViewModel) {
+    val resolver = androidx.compose.ui.platform.LocalContext.current.contentResolver
+    var confirmDelete by remember { mutableStateOf(false) }
+    val today = java.time.LocalDate.now()
+
+    val backupLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
+    ) { uri -> if (uri != null) viewModel.exportBackup(uri, resolver) }
+
+    val csvLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri -> if (uri != null) viewModel.exportMealsCsv(uri, resolver) }
+
+    val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri -> if (uri != null) viewModel.importBackup(uri, resolver) }
+
+    Column(
+        modifier = Modifier.fillMaxWidth().background(KaloSurface, RoundedCornerShape(16.dp)).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text("YOUR DATA", style = KaloTypography.labelSmall, color = KaloTextSecondary)
+        Text(
+            "Everything lives only on this phone. The one exception: when you scan a meal photo, that photo is sent to Google Gemini for analysis. " +
+                "There is no cloud backup, so export a file now and then (photos are not included).",
+            style = KaloTypography.bodyMedium,
+            color = KaloTextMuted
+        )
+
+        if (!state.dataMessage.isNullOrBlank()) {
+            Text(
+                state.dataMessage ?: "",
+                style = KaloTypography.bodyMedium,
+                color = if (state.dataOk) KaloSteps else KaloFat
+            )
+        }
+
+        OutlinedButton(
+            onClick = { backupLauncher.launch("kalo-backup-$today.json") },
+            enabled = !state.dataBusy,
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Export backup (JSON)") }
+
+        OutlinedButton(
+            onClick = { importLauncher.launch(arrayOf("*/*")) },
+            enabled = !state.dataBusy,
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Import backup") }
+
+        OutlinedButton(
+            onClick = { csvLauncher.launch("kalo-meals-$today.csv") },
+            enabled = !state.dataBusy,
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Export meals for spreadsheet (CSV)") }
+
+        OutlinedButton(
+            onClick = { confirmDelete = true },
+            enabled = !state.dataBusy,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = KaloFat)
+        ) { Text("Delete all my data") }
+    }
+
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Delete everything?") },
+            text = {
+                Text("This permanently deletes all meals, workouts, water and weight entries and meal photos on this phone. Your goals and API key stay. Export a backup first if you might want this back.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDelete = false
+                    viewModel.deleteAllData()
+                }) { Text("Delete", color = KaloFat) }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } }
         )
     }
 }
