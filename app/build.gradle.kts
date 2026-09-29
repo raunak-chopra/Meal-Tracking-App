@@ -8,7 +8,7 @@ plugins {
 
 android {
     namespace = "com.kalotracker.app"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.kalotracker.app"
@@ -91,6 +91,9 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
 
+    // CameraX exposes ListenableFuture (Guava) in its public API
+    implementation("com.google.guava:guava:33.3.1-android")
+
     // Google ML Kit Barcode Scanning (On-Device, Offline)
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
 
@@ -104,12 +107,12 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.7.0")
 
     // Supabase Kotlin SDK
-    val supabaseVersion = "2.5.4"
+    val supabaseVersion = "3.0.3"
     implementation("io.github.jan-tennert.supabase:postgrest-kt:$supabaseVersion")
     implementation("io.github.jan-tennert.supabase:storage-kt:$supabaseVersion")
     implementation("io.github.jan-tennert.supabase:auth-kt:$supabaseVersion")
     implementation("io.github.jan-tennert.supabase:functions-kt:$supabaseVersion")
-    implementation("io.ktor:ktor-client-android:2.3.12")
+    implementation("io.ktor:ktor-client-android:3.0.3")
 
     // Kotlinx Serialization & Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")

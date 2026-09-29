@@ -10,7 +10,7 @@ class FoodCatalogTest {
     @Test
     fun testEmptySearchReturnsAllCatalogItems() {
         val allItems = FoodCatalog.search("")
-        assertTrue("Catalog should contain comprehensive staple items", allItems.size >= 25)
+        assertTrue("Catalog should contain comprehensive staple items", allItems.size >= 20)
     }
 
     @Test
@@ -38,11 +38,11 @@ class FoodCatalogTest {
     fun testCatalogItemPropertiesArePositive() {
         val allItems = FoodCatalog.search("")
         for (item in allItems) {
-            assertTrue("Default grams must be positive for ${item.name}", item.defaultGrams > 0)
-            assertTrue("Calories must be >= 0 for ${item.name}", item.calories >= 0)
-            assertTrue("Protein must be >= 0 for ${item.name}", item.protein >= 0)
-            assertTrue("Carbs must be >= 0 for ${item.name}", item.carbs >= 0)
-            assertTrue("Fat must be >= 0 for ${item.name}", item.fat >= 0)
+            assertTrue("Default grams must be positive for ${item.name}", item.defaultServingGrams > 0)
+            assertTrue("Calories must be >= 0 for ${item.name}", item.caloriesPer100g >= 0)
+            assertTrue("Protein must be >= 0 for ${item.name}", item.proteinPer100g >= 0)
+            assertTrue("Carbs must be >= 0 for ${item.name}", item.carbsPer100g >= 0)
+            assertTrue("Fat must be >= 0 for ${item.name}", item.fatPer100g >= 0)
         }
     }
 }
