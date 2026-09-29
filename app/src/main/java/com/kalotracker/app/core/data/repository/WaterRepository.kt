@@ -18,6 +18,9 @@ class WaterRepository(
         return waterDao.getWaterLogsForDay(startOfDay, endOfDay)
     }
 
+    suspend fun getLogsBetween(start: Long, end: Long): List<WaterLogEntity> =
+        withContext(Dispatchers.IO) { waterDao.getWaterLogsBetween(start, end) }
+
     suspend fun logWater(milliliters: Int, timestamp: Long = System.currentTimeMillis()) =
         withContext(Dispatchers.IO) {
             val entity = WaterLogEntity(

@@ -206,6 +206,10 @@ fun SettingsScreen(
                 }
             }
 
+            item { GoalTypeSection(state = state, viewModel = viewModel) }
+
+            item { ReminderSection(state = state, viewModel = viewModel) }
+
             // Section: AI meal scanning (user's own Gemini key)
             item { AiSettingsSection(state = state, viewModel = viewModel) }
         }
@@ -324,5 +328,93 @@ fun AiSettingsSection(
                 ) { Text("Remove key") }
             }
         }
+    }
+}
+
+@Composable
+private fun GoalTypeSection(state: SettingsUiState, viewModel: SettingsViewModel) {
+    Column(
+        modifier = Modifier.fillMaxWidth().background(KaloSurface, RoundedCornerShape(16.dp)).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text("YOUR GOAL", style = KaloTypography.labelSmall, color = KaloTextSecondary)
+        Text(
+            "Used on the Trends screen to check whether your calorie target matches how your weight is actually moving.",
+            style = KaloTypography.bodyMedium,
+            color = KaloTextMuted
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            com.kalotracker.app.core.ai.GoalType.entries.forEach { goal ->
+                FilterChip(
+                    selected = state.goal == goal,
+                    onClick = { viewModel.setGoal(goal) },
+                    label = { Text(goal.label) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReminderSection(state: SettingsUiState, viewModel: SettingsViewModel) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var showTimePicker by remember { mutableStateOf(false) }
+
+    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted -> viewModel.setReminderEnabled(granted) }
+
+    fun onToggle(enabled: Boolean) {
+        val needsPermission = enabled && android.os.Build.VERSION.SDK_INT >= 33 &&
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.POST_NOTIFICATIONS
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (needsPermission) permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        else viewModel.setReminderEnabled(enabled)
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth().background(KaloSurface, RoundedCornerShape(16.dp)).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("DAILY REMINDER", style = KaloTypography.labelSmall, color = KaloTextSecondary)
+                Text(
+                    "A nudge only when fewer than 2 meals are logged that day.",
+                    style = KaloTypography.bodyMedium,
+                    color = KaloTextMuted
+                )
+            }
+            Switch(checked = state.reminder.enabled, onCheckedChange = { onToggle(it) })
+        }
+        if (state.reminder.enabled) {
+            OutlinedButton(onClick = { showTimePicker = true }) {
+                Text("Remind me at %02d:%02d".format(state.reminder.hour, state.reminder.minute))
+            }
+        }
+    }
+
+    if (showTimePicker) {
+        val timeState = rememberTimePickerState(
+            initialHour = state.reminder.hour,
+            initialMinute = state.reminder.minute,
+            is24Hour = true
+        )
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.setReminderTime(timeState.hour, timeState.minute)
+                    showTimePicker = false
+                }) { Text("Set") }
+            },
+            dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("Cancel") } },
+            text = { TimePicker(state = timeState) }
+        )
     }
 }

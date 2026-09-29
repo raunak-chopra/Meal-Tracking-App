@@ -50,6 +50,7 @@ class MainActivity : ComponentActivity() {
                     appSettings = app.appSettings,
                     analysisService = app.analysisService,
                     waterRepository = app.waterRepository,
+                    weightRepository = app.weightRepository,
                     healthConnectManager = app.healthConnectManager,
                     onOpenHealthPermissions = { requestHealthPermissions() },
                     startDestination = startDestination

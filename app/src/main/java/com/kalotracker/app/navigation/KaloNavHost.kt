@@ -19,6 +19,12 @@ import com.kalotracker.app.feature.meal.EditMealViewModelFactory
 import com.kalotracker.app.core.data.repository.MealRepository
 import com.kalotracker.app.core.data.repository.UserProfileRepository
 import com.kalotracker.app.core.data.repository.WaterRepository
+import com.kalotracker.app.core.data.repository.WeightRepository
+import com.kalotracker.app.core.reminder.ReminderScheduler
+import com.kalotracker.app.feature.trends.TrendsScreen
+import com.kalotracker.app.feature.trends.TrendsViewModel
+import com.kalotracker.app.feature.trends.TrendsViewModelFactory
+import androidx.compose.ui.platform.LocalContext
 import com.kalotracker.app.core.data.repository.WorkoutRepository
 import com.kalotracker.app.core.health.HealthConnectManager
 import com.kalotracker.app.core.network.MealAnalysisService
@@ -50,6 +56,7 @@ fun KaloNavHost(
     appSettings: AppSettings,
     analysisService: MealAnalysisService,
     waterRepository: WaterRepository,
+    weightRepository: WeightRepository,
     healthConnectManager: HealthConnectManager,
     onOpenHealthPermissions: () -> Unit,
     modifier: Modifier = Modifier,
@@ -57,6 +64,7 @@ fun KaloNavHost(
     navController: NavHostController = rememberNavController()
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val appContext = LocalContext.current.applicationContext
 
     NavHost(
         navController = navController,
@@ -82,7 +90,8 @@ fun KaloNavHost(
                 onNavigateToWorkout = { navController.navigate(KaloDestinations.WORKOUT) },
                 onNavigateToHealthPermissions = { navController.navigate(KaloDestinations.HEALTH_PERMISSIONS) },
                 onNavigateToSettings = { navController.navigate(KaloDestinations.SETTINGS) },
-                onNavigateToEditMeal = { id -> navController.navigate(KaloDestinations.editMeal(id)) }
+                onNavigateToEditMeal = { id -> navController.navigate(KaloDestinations.editMeal(id)) },
+                onNavigateToTrends = { navController.navigate(KaloDestinations.TRENDS) }
             )
         }
 
@@ -145,12 +154,32 @@ fun KaloNavHost(
             )
         }
 
+        composable(KaloDestinations.TRENDS) {
+            val trendsViewModel: TrendsViewModel = viewModel(
+                factory = TrendsViewModelFactory(
+                    mealRepository = mealRepository,
+                    workoutRepository = workoutRepository,
+                    waterRepository = waterRepository,
+                    weightRepository = weightRepository,
+                    userProfileRepository = userProfileRepository,
+                    appSettings = appSettings,
+                    analysisService = analysisService
+                )
+            )
+            TrendsScreen(
+                viewModel = trendsViewModel,
+                onBack = { navController.popBackStack() },
+                onOpenSettings = { navController.navigate(KaloDestinations.SETTINGS) }
+            )
+        }
+
         composable(KaloDestinations.SETTINGS) {
             val settingsViewModel: SettingsViewModel = viewModel(
                 factory = SettingsViewModelFactory(
                     userProfileRepository = userProfileRepository,
                     appSettings = appSettings,
-                    analysisService = analysisService
+                    analysisService = analysisService,
+                    scheduleReminder = { ReminderScheduler.schedule(appContext, it, replace = true) }
                 )
             )
 

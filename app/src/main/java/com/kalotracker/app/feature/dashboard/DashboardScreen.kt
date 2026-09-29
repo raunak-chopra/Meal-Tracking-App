@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CropFree
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Restaurant
@@ -58,6 +59,7 @@ fun DashboardScreen(
     onNavigateToHealthPermissions: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToEditMeal: (String) -> Unit,
+    onNavigateToTrends: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -159,6 +161,21 @@ fun DashboardScreen(
                         )
                     }
 
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    IconButton(
+                        onClick = onNavigateToTrends,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(KaloSurfaceElevated)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Insights,
+                            contentDescription = "Trends and coaching",
+                            tint = KaloTextPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                     IconButton(
                         onClick = onNavigateToSettings,
                         modifier = Modifier
@@ -172,6 +189,7 @@ fun DashboardScreen(
                             tint = KaloTextPrimary,
                             modifier = Modifier.size(20.dp)
                         )
+                    }
                     }
                 }
             }
