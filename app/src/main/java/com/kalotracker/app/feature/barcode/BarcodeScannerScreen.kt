@@ -48,6 +48,7 @@ fun BarcodeScannerScreen(
     onClose: () -> Unit,
     onMealSaved: () -> Unit,
     onProductSelected: ((String, Float, Int, Float, Float, Float) -> Unit)? = null,
+    onEnterManually: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -70,8 +71,10 @@ fun BarcodeScannerScreen(
     }
 
     // Reactively pause/resume camera analyzer when product popup is shown
-    LaunchedEffect(state.product, state.isLookingUp) {
-        barcodeAnalyzer.setScanningEnabled(state.product == null && !state.isLookingUp)
+    LaunchedEffect(state.product, state.isLookingUp, state.errorMessage) {
+        barcodeAnalyzer.setScanningEnabled(
+            state.product == null && !state.isLookingUp && state.errorMessage == null
+        )
     }
 
     // Toggle torch on camera instance
@@ -116,7 +119,7 @@ fun BarcodeScannerScreen(
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
-                }, ctx.mainExecutor)
+                }, androidx.core.content.ContextCompat.getMainExecutor(ctx))
 
                 previewView
             },
@@ -228,28 +231,45 @@ fun BarcodeScannerScreen(
             }
         }
 
-        // Error Banner
+        // Lookup failure card: never invents a product, offers honest next steps
         AnimatedVisibility(
             visible = state.errorMessage != null,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .statusBarsPadding()
-                .padding(top = 70.dp, start = 20.dp, end = 20.dp)
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
         ) {
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(KaloFat.copy(alpha = 0.9f))
-                    .padding(14.dp)
+                    .navigationBarsPadding()
+                    .padding(20.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(KaloSurface)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                Text(
+                    text = "Couldn't find this product",
+                    style = KaloTypography.titleMedium,
+                    color = KaloTextPrimary
+                )
                 Text(
                     text = state.errorMessage ?: "",
                     style = KaloTypography.bodyMedium,
-                    color = Color.White
+                    color = KaloTextSecondary
                 )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(
+                        onClick = { viewModel.resumeScanning() },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Scan again") }
+                    if (onEnterManually != null) {
+                        Button(
+                            onClick = onEnterManually,
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Enter manually") }
+                    }
+                }
             }
         }
 

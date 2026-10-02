@@ -3,6 +3,7 @@
 
     <!-- Network -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Camera for meal scanning -->
     <uses-permission android:name="android.permission.CAMERA" />
@@ -19,7 +20,7 @@
 
     <!-- Health Connect Permissions (Google Fit / Samsung Health) -->
     <uses-permission android:name="android.permission.health.READ_STEPS" />
-    <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" />
+    <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" />
 
     <!-- Query Health Connect Provider APK on Android 13 and below -->
     <queries>
@@ -28,7 +29,7 @@
 
     <application
         android:name=".KaloApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"

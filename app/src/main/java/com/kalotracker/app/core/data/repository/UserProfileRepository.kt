@@ -2,36 +2,19 @@ package com.kalotracker.app.core.data.repository
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.kalotracker.app.core.network.SupabaseModule
-import io.github.jan.supabase.auth.auth
-import io.github.jan.supabase.postgrest.from
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import com.kalotracker.app.core.ai.GoalType
 
-@Serializable
 data class UserProfile(
-    @SerialName("daily_calorie_target") val targetCalories: Int = 2200,
-    @SerialName("daily_protein_target") val targetProtein: Int = 160,
-    @SerialName("daily_carbs_target") val targetCarbs: Int = 220,
-    @SerialName("daily_fat_target") val targetFat: Int = 70,
-    @SerialName("daily_step_goal") val targetSteps: Long = 10000L,
-    @SerialName("daily_water_target") val targetWaterMl: Int = 2500
-)
-
-@Serializable
-data class RemoteProfileUpsert(
-    val id: String,
-    val daily_calorie_target: Int,
-    val daily_protein_target: Int,
-    val daily_carbs_target: Int,
-    val daily_fat_target: Int,
-    val daily_step_goal: Long
+    val targetCalories: Int = 2200,
+    val targetProtein: Int = 160,
+    val targetCarbs: Int = 220,
+    val targetFat: Int = 70,
+    val targetSteps: Long = 10000L,
+    val targetWaterMl: Int = 2500,
+    val goal: GoalType = GoalType.MAINTAIN
 )
 
 enum class MacroPreset(val title: String, val proteinPct: Int, val carbsPct: Int, val fatPct: Int) {
@@ -57,7 +40,9 @@ class UserProfileRepository(context: Context) {
             targetCarbs = prefs.getInt("target_carbs", 220),
             targetFat = prefs.getInt("target_fat", 70),
             targetSteps = prefs.getLong("target_steps", 10000L),
-            targetWaterMl = prefs.getInt("target_water_ml", 2500)
+            targetWaterMl = prefs.getInt("target_water_ml", 2500),
+            goal = runCatching { GoalType.valueOf(prefs.getString("goal", null) ?: "") }
+                .getOrDefault(GoalType.MAINTAIN)
         )
     }
 
@@ -75,7 +60,8 @@ class UserProfileRepository(context: Context) {
             targetCarbs = carbs,
             targetFat = fat,
             targetSteps = steps,
-            targetWaterMl = waterMl
+            targetWaterMl = waterMl,
+            goal = _profile.value.goal
         )
         prefs.edit()
             .putInt("target_calories", calories)
@@ -87,9 +73,26 @@ class UserProfileRepository(context: Context) {
             .apply()
 
         _profile.value = updated
+    }
 
-        // Sync to Supabase in background if user is authenticated
-        syncProfileToRemote(updated)
+    fun setGoal(goal: GoalType) {
+        prefs.edit().putString("goal", goal.name).apply()
+        _profile.value = _profile.value.copy(goal = goal)
+    }
+
+    /** Changes only the calorie target, rescaling macros to keep the current split. */
+    fun setCalorieTargetKeepingSplit(newCalories: Int) {
+        val p = _profile.value
+        if (p.targetCalories <= 0) return
+        val ratio = newCalories.toFloat() / p.targetCalories
+        updateTargets(
+            calories = newCalories,
+            protein = p.targetProtein,
+            carbs = (p.targetCarbs * ratio).toInt(),
+            fat = (p.targetFat * ratio).toInt(),
+            steps = p.targetSteps,
+            waterMl = p.targetWaterMl
+        )
     }
 
     fun applyPreset(preset: MacroPreset, totalCalories: Int) {
@@ -106,25 +109,5 @@ class UserProfileRepository(context: Context) {
             fat = fatGrams,
             steps = _profile.value.targetSteps
         )
-    }
-
-    private fun syncProfileToRemote(profile: UserProfile) {
-        if (!SupabaseModule.isConfigured) return
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val user = SupabaseModule.client.auth.currentUserOrNull() ?: return@launch
-                val remoteProfile = RemoteProfileUpsert(
-                    id = user.id,
-                    daily_calorie_target = profile.targetCalories,
-                    daily_protein_target = profile.targetProtein,
-                    daily_carbs_target = profile.targetCarbs,
-                    daily_fat_target = profile.targetFat,
-                    daily_step_goal = profile.targetSteps
-                )
-                SupabaseModule.client.from("profiles").upsert(remoteProfile)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
     }
 }

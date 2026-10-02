@@ -1,15 +1,23 @@
 package com.kalotracker.app.feature.settings
 
+import android.content.ContentResolver
+import android.net.Uri
 import androidx.lifecycle.ViewModel
+import com.kalotracker.app.core.data.backup.BackupCodec
+import com.kalotracker.app.core.data.backup.BackupManager
+import com.kalotracker.app.core.data.backup.ImportSummary
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.kalotracker.app.core.data.repository.AuthRepository
+import com.kalotracker.app.core.ai.GoalType
 import com.kalotracker.app.core.data.repository.MacroPreset
-import com.kalotracker.app.core.data.repository.MealRepository
 import com.kalotracker.app.core.data.repository.UserProfile
 import com.kalotracker.app.core.data.repository.UserProfileRepository
-import com.kalotracker.app.core.data.repository.WorkoutRepository
-import com.kalotracker.app.core.network.SupabaseModule
+import com.kalotracker.app.core.network.MealAnalysisService
+import com.kalotracker.app.core.settings.AiSettings
+import com.kalotracker.app.core.settings.AppSettings
+import com.kalotracker.app.core.settings.ReminderSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,21 +32,35 @@ data class SettingsUiState(
     val fatInput: String = "70",
     val stepsInput: String = "10000",
     val waterInput: String = "2500",
-    val isSyncing: Boolean = false,
-    val syncMessage: String? = null,
-    val isSupabaseConfigured: Boolean = false,
-    val userEmail: String? = null,
-    val isGuestMode: Boolean = true
+    val apiKeyInput: String = "",
+    val modelInput: String = AppSettings.DEFAULT_MODEL,
+    val aiConfigured: Boolean = false,
+    val isTestingAi: Boolean = false,
+    val aiTestMessage: String? = null,
+    val aiTestOk: Boolean = false,
+    val goal: GoalType = GoalType.MAINTAIN,
+    val reminder: ReminderSettings = ReminderSettings(),
+    val dataBusy: Boolean = false,
+    val dataMessage: String? = null,
+    val dataOk: Boolean = false
 )
 
 class SettingsViewModel(
     private val userProfileRepository: UserProfileRepository,
-    private val mealRepository: MealRepository,
-    private val workoutRepository: WorkoutRepository,
-    private val authRepository: AuthRepository
+    private val appSettings: AppSettings,
+    private val analysisService: MealAnalysisService,
+    private val backupManager: BackupManager,
+    private val scheduleReminder: (ReminderSettings) -> Unit
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(SettingsUiState())
+    private val _uiState = MutableStateFlow(
+        SettingsUiState(
+            apiKeyInput = appSettings.ai.value.apiKey,
+            modelInput = appSettings.ai.value.model,
+            aiConfigured = appSettings.ai.value.isConfigured,
+            reminder = appSettings.reminder.value
+        )
+    )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
@@ -53,46 +75,35 @@ class SettingsViewModel(
                         fatInput = profile.targetFat.toString(),
                         stepsInput = profile.targetSteps.toString(),
                         waterInput = profile.targetWaterMl.toString(),
-                        isSupabaseConfigured = SupabaseModule.isConfigured
-                    )
-                }
-            }
-        }
-
-        viewModelScope.launch {
-            authRepository.authState.collect { auth ->
-                _uiState.update {
-                    it.copy(
-                        userEmail = auth.email,
-                        isGuestMode = auth.isGuestMode
+                        goal = profile.goal
                     )
                 }
             }
         }
     }
 
-    fun updateCalorieInput(value: String) {
-        _uiState.update { it.copy(calorieInput = value) }
+    fun updateCalorieInput(value: String) = _uiState.update { it.copy(calorieInput = value) }
+    fun updateProteinInput(value: String) = _uiState.update { it.copy(proteinInput = value) }
+    fun updateCarbsInput(value: String) = _uiState.update { it.copy(carbsInput = value) }
+    fun updateFatInput(value: String) = _uiState.update { it.copy(fatInput = value) }
+    fun updateStepsInput(value: String) = _uiState.update { it.copy(stepsInput = value) }
+    fun updateWaterInput(value: String) = _uiState.update { it.copy(waterInput = value) }
+    fun updateApiKeyInput(value: String) = _uiState.update { it.copy(apiKeyInput = value, aiTestMessage = null) }
+    fun updateModelInput(value: String) = _uiState.update { it.copy(modelInput = value, aiTestMessage = null) }
+
+    fun setGoal(goal: GoalType) {
+        userProfileRepository.setGoal(goal)
     }
 
-    fun updateProteinInput(value: String) {
-        _uiState.update { it.copy(proteinInput = value) }
-    }
+    fun setReminderEnabled(enabled: Boolean) = updateReminder(_uiState.value.reminder.copy(enabled = enabled))
 
-    fun updateCarbsInput(value: String) {
-        _uiState.update { it.copy(carbsInput = value) }
-    }
+    fun setReminderTime(hour: Int, minute: Int) =
+        updateReminder(_uiState.value.reminder.copy(hour = hour, minute = minute))
 
-    fun updateFatInput(value: String) {
-        _uiState.update { it.copy(fatInput = value) }
-    }
-
-    fun updateStepsInput(value: String) {
-        _uiState.update { it.copy(stepsInput = value) }
-    }
-
-    fun updateWaterInput(value: String) {
-        _uiState.update { it.copy(waterInput = value) }
+    private fun updateReminder(reminder: ReminderSettings) {
+        appSettings.saveReminder(reminder)
+        scheduleReminder(reminder)
+        _uiState.update { it.copy(reminder = reminder) }
     }
 
     fun applyPreset(preset: MacroPreset) {
@@ -101,60 +112,109 @@ class SettingsViewModel(
     }
 
     fun saveGoals() {
-        val calories = _uiState.value.calorieInput.toIntOrNull() ?: 2200
-        val protein = _uiState.value.proteinInput.toIntOrNull() ?: 160
-        val carbs = _uiState.value.carbsInput.toIntOrNull() ?: 220
-        val fat = _uiState.value.fatInput.toIntOrNull() ?: 70
-        val steps = _uiState.value.stepsInput.toLongOrNull() ?: 10000L
-        val water = _uiState.value.waterInput.toIntOrNull() ?: 2500
-
+        val s = _uiState.value
         userProfileRepository.updateTargets(
-            calories = calories,
-            protein = protein,
-            carbs = carbs,
-            fat = fat,
-            steps = steps,
-            waterMl = water
+            calories = s.calorieInput.toIntOrNull() ?: 2200,
+            protein = s.proteinInput.toIntOrNull() ?: 160,
+            carbs = s.carbsInput.toIntOrNull() ?: 220,
+            fat = s.fatInput.toIntOrNull() ?: 70,
+            steps = s.stepsInput.toLongOrNull() ?: 10000L,
+            waterMl = s.waterInput.toIntOrNull() ?: 2500
         )
     }
 
-    fun syncCloudNow() {
+    /** Saves the key/model, then makes a tiny request so a wrong key or model is caught right away. */
+    fun saveAndTestAi() {
+        val s = _uiState.value
+        val candidate = AiSettings(s.apiKeyInput.trim(), s.modelInput.trim().ifBlank { AppSettings.DEFAULT_MODEL })
+        appSettings.saveAi(candidate.apiKey, candidate.model)
+        _uiState.update { it.copy(isTestingAi = true, aiTestMessage = null, aiConfigured = candidate.isConfigured) }
         viewModelScope.launch {
-            _uiState.update { it.copy(isSyncing = true, syncMessage = null) }
-            val mealResult = mealRepository.syncPendingMeals()
-            val workoutResult = workoutRepository.syncPendingWorkouts()
-            val totalSynced = (mealResult.getOrElse { 0 }) + (workoutResult.getOrElse { 0 })
-            val hasError = mealResult.isFailure || workoutResult.isFailure
+            val result = analysisService.testConnection(candidate)
             _uiState.update {
                 it.copy(
-                    isSyncing = false,
-                    syncMessage = if (hasError)
-                        "Sync partially failed — check connection"
-                    else if (totalSynced > 0) "Successfully synced $totalSynced items"
-                    else "All items up to date"
+                    isTestingAi = false,
+                    aiTestOk = result.isSuccess,
+                    aiTestMessage = if (result.isSuccess) "Connected. Photo scanning is ready."
+                    else result.exceptionOrNull()?.localizedMessage ?: "Test failed"
                 )
             }
         }
     }
 
-    fun signOut(onSignedOut: () -> Unit) {
+    private fun runData(successMessage: (Any?) -> String, block: suspend () -> Any?) {
+        if (_uiState.value.dataBusy) return
+        _uiState.update { it.copy(dataBusy = true, dataMessage = null) }
         viewModelScope.launch {
-            authRepository.signOut()
-            onSignedOut()
+            val result = runCatching { block() }
+            _uiState.update {
+                it.copy(
+                    dataBusy = false,
+                    dataOk = result.isSuccess,
+                    dataMessage = result.fold(
+                        onSuccess = { value -> successMessage(value) },
+                        onFailure = { e -> e.localizedMessage ?: "Something went wrong." }
+                    )
+                )
+            }
         }
+    }
+
+    fun exportBackup(uri: Uri, resolver: ContentResolver) = runData(
+        successMessage = { "Backup saved (${it as Int} entries). Photos are not included." }
+    ) {
+        val backup = backupManager.buildBackup()
+        writeText(resolver, uri, BackupCodec.encode(backup))
+        backup.meals.size + backup.workouts.size + backup.water.size + backup.weights.size
+    }
+
+    fun exportMealsCsv(uri: Uri, resolver: ContentResolver) = runData(
+        successMessage = { "Exported ${it as Int} meals to CSV." }
+    ) {
+        val backup = backupManager.buildBackup()
+        writeText(resolver, uri, BackupCodec.mealsToCsv(backup.meals))
+        backup.meals.size
+    }
+
+    fun importBackup(uri: Uri, resolver: ContentResolver) = runData(
+        successMessage = {
+            val r = it as ImportSummary
+            "Imported ${r.meals} meals, ${r.workouts} workouts, ${r.water} water and ${r.weights} weight entries."
+        }
+    ) {
+        val text = withContext(Dispatchers.IO) {
+            resolver.openInputStream(uri)?.bufferedReader()?.use { reader -> reader.readText() }
+                ?: throw java.io.IOException("Couldn't open that file.")
+        }
+        backupManager.import(BackupCodec.decode(text))
+    }
+
+    fun deleteAllData() = runData(successMessage = { "All logs and photos were deleted." }) {
+        backupManager.deleteAllData()
+    }
+
+    private suspend fun writeText(resolver: ContentResolver, uri: Uri, text: String) = withContext(Dispatchers.IO) {
+        resolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use { it.write(text) }
+            ?: throw java.io.IOException("Couldn't write to that location.")
+    }
+
+    fun clearAiKey() {
+        appSettings.saveAi("", _uiState.value.modelInput)
+        _uiState.update { it.copy(apiKeyInput = "", aiConfigured = false, aiTestMessage = null) }
     }
 }
 
 class SettingsViewModelFactory(
     private val userProfileRepository: UserProfileRepository,
-    private val mealRepository: MealRepository,
-    private val workoutRepository: WorkoutRepository,
-    private val authRepository: AuthRepository
+    private val appSettings: AppSettings,
+    private val analysisService: MealAnalysisService,
+    private val backupManager: BackupManager,
+    private val scheduleReminder: (ReminderSettings) -> Unit
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return SettingsViewModel(userProfileRepository, mealRepository, workoutRepository, authRepository) as T
+            return SettingsViewModel(userProfileRepository, appSettings, analysisService, backupManager, scheduleReminder) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

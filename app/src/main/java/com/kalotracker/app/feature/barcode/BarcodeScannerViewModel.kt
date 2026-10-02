@@ -65,7 +65,7 @@ class BarcodeScannerViewModel(
                 _uiState.update {
                     it.copy(
                         isLookingUp = false,
-                        errorMessage = "Product not found: ${err.localizedMessage}"
+                        errorMessage = err.localizedMessage ?: "Lookup failed."
                     )
                 }
             }

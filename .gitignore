@@ -41,3 +41,24 @@ captures/
 # OS specific
 .DS_Store
 Thumbs.db
+
+# Private configuration, credentials and personal exports
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+keystore.properties
+secrets.properties
+*.db
+*.db-shm
+*.db-wal
+backups/
+exports/
+.kotlin/
+
+# Local review artifacts (source history belongs in Git)
+docs/*.diff
+/release-notes.md
+/.release-setup/

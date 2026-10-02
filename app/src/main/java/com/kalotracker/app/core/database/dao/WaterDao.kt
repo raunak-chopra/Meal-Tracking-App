@@ -20,6 +20,18 @@ interface WaterDao {
     @Query("SELECT COALESCE(SUM(milliliters), 0) FROM water_logs WHERE timestamp >= :startOfDay AND timestamp <= :endOfDay")
     suspend fun getTotalWaterForDayOnce(startOfDay: Long, endOfDay: Long): Int
 
+    @Query("SELECT * FROM water_logs WHERE timestamp >= :start AND timestamp <= :end ORDER BY timestamp ASC")
+    suspend fun getWaterLogsBetween(start: Long, end: Long): List<WaterLogEntity>
+
+    @Query("SELECT * FROM water_logs ORDER BY timestamp ASC")
+    suspend fun getAll(): List<WaterLogEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(logs: List<WaterLogEntity>)
+
+    @Query("DELETE FROM water_logs")
+    suspend fun deleteAll()
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWaterLog(waterLog: WaterLogEntity)
 

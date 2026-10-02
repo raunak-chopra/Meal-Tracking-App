@@ -3,6 +3,8 @@ package com.kalotracker.app.feature.workout
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.kalotracker.app.core.ai.OverloadCoach
+import com.kalotracker.app.core.ai.PastSet
 import com.kalotracker.app.core.data.repository.WorkoutRepository
 import com.kalotracker.app.core.database.entity.ExerciseSetEntity
 import com.kalotracker.app.core.database.entity.WorkoutEntity
@@ -30,6 +32,8 @@ data class WorkoutUiState(
     val durationMinutes: String = "45",
     val estimatedCalories: String = "220",
     val previousSessionFound: Boolean = false,
+    val overloadHint: String? = null,
+    val timestamp: Long = System.currentTimeMillis(),
     val isSaved: Boolean = false
 )
 
@@ -78,6 +82,10 @@ class WorkoutViewModel(
         _uiState.update { it.copy(exerciseName = name) }
     }
 
+    fun setTimestamp(millis: Long) {
+        _uiState.update { it.copy(timestamp = millis) }
+    }
+
     private fun loadHistoryForExercise(name: String) {
         viewModelScope.launch {
             val previousSets = workoutRepository.getLastSessionSetsForExercise(name)
@@ -92,11 +100,12 @@ class WorkoutViewModel(
                 _uiState.update {
                     it.copy(
                         sets = loaded,
-                        previousSessionFound = true
+                        previousSessionFound = true,
+                        overloadHint = OverloadCoach.suggest(previousSets.map { s -> PastSet(s.weightKg, s.reps) })
                     )
                 }
             } else {
-                _uiState.update { it.copy(previousSessionFound = false) }
+                _uiState.update { it.copy(previousSessionFound = false, overloadHint = null) }
             }
         }
     }
@@ -175,7 +184,8 @@ class WorkoutViewModel(
                 title = state.exerciseName.ifBlank { "Workout Session" },
                 type = if (state.isCardio) "CARDIO" else "STRENGTH",
                 durationMinutes = state.durationMinutes.toIntOrNull() ?: 45,
-                estimatedCaloriesBurned = state.estimatedCalories.toIntOrNull() ?: 200
+                estimatedCaloriesBurned = state.estimatedCalories.toIntOrNull() ?: 200,
+                timestamp = state.timestamp
             )
 
             val setEntities = state.sets.map { set ->

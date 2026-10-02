@@ -6,119 +6,158 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.kalotracker.app.core.designsystem.*
+import com.kalotracker.app.core.designsystem.components.DateTimeChip
 import com.kalotracker.app.core.designsystem.components.KaloButton
+
+/** Everything the user can change about an AI result before it is saved. */
+data class MealReviewActions(
+    val onTitleChange: (String) -> Unit,
+    val onNameChange: (String, String) -> Unit,
+    val onGramsChange: (String, Float) -> Unit,
+    val onRemoveItem: (String) -> Unit,
+    val onAddFood: () -> Unit,
+    val onNoteChange: (String) -> Unit,
+    val onReanalyze: () -> Unit,
+    val onToggleOil: () -> Unit,
+    val onTimeChange: (Long) -> Unit,
+    val onSave: () -> Unit,
+    val onDiscard: () -> Unit
+)
 
 @Composable
 fun MealReviewBottomSheet(
     uiState: MealScanUiState,
-    onAdjustWeight: (String, Float) -> Unit,
-    onSaveMeal: () -> Unit,
-    onDismiss: () -> Unit,
+    actions: MealReviewActions,
     modifier: Modifier = Modifier
 ) {
+    val lowConfidence = uiState.confidence < 0.6f
+
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(KaloBackground.copy(alpha = 0.95f))
+            .background(KaloBackground.copy(alpha = 0.97f))
             .statusBarsPadding()
             .navigationBarsPadding()
             .padding(horizontal = 20.dp, vertical = 16.dp)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Drag handle / Title
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "AI ESTIMATION",
-                    style = KaloTypography.labelSmall,
-                    color = KaloProtein
-                )
-
-                Text(
-                    text = "${(uiState.confidence * 100).toInt()}% Confidence",
-                    style = KaloTypography.bodyMedium,
-                    color = KaloTextMuted
-                )
+                Column {
+                    Text("AI ESTIMATE - CHECK BEFORE SAVING", style = KaloTypography.labelSmall, color = KaloProtein)
+                    Text(
+                        text = "${(uiState.confidence * 100).toInt()}% confidence" +
+                            if (lowConfidence) " - low, please review carefully" else "",
+                        style = KaloTypography.bodyMedium,
+                        color = if (lowConfidence) KaloFat else KaloTextMuted
+                    )
+                }
+                IconButton(
+                    onClick = actions.onDiscard,
+                    modifier = Modifier.size(40.dp).clip(CircleShape).background(KaloSurfaceElevated)
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = "Discard scan", tint = KaloTextPrimary)
+                }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
 
-            // Meal Title & Total Calories
-            Text(
-                text = uiState.mealTitle.ifBlank { "Detected Meal" },
-                style = KaloTypography.headlineMedium,
-                color = KaloTextPrimary
+            OutlinedTextField(
+                value = uiState.mealTitle,
+                onValueChange = actions.onTitleChange,
+                label = { Text("Meal name") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(Modifier.height(8.dp))
 
             Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                Text("${uiState.totalCalories} kcal", style = KaloTypography.displayMedium, color = KaloCalories)
                 Text(
-                    text = "${uiState.totalCalories} kcal",
-                    style = KaloTypography.displayMedium,
-                    color = KaloCalories
-                )
-                Text(
-                    text = "${uiState.totalProtein.toInt()}g P  •  ${uiState.totalCarbs.toInt()}g C  •  ${uiState.totalFat.toInt()}g F",
+                    "${uiState.totalProtein.toInt()}g P  •  ${uiState.totalCarbs.toInt()}g C  •  ${uiState.totalFat.toInt()}g F",
                     style = KaloTypography.titleMedium,
                     color = KaloTextSecondary
                 )
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Food items breakdown
-            Text(
-                text = "PORTION CALIBRATION (TAP TO TWEAK)",
-                style = KaloTypography.labelSmall,
-                color = KaloTextMuted
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
+            DateTimeChip(millis = uiState.timestamp, onChange = actions.onTimeChange)
+            Spacer(Modifier.height(12.dp))
 
             LazyColumn(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(uiState.items) { item ->
-                    ItemWeightRow(
+                items(uiState.items, key = { it.id }) { item ->
+                    EditableItemRow(
                         item = item,
-                        onDecrement = { onAdjustWeight(item.id, 0.9f) },
-                        onIncrement = { onAdjustWeight(item.id, 1.1f) }
+                        onNameChange = { actions.onNameChange(item.id, it) },
+                        onGramsChange = { actions.onGramsChange(item.id, it) },
+                        onRemove = { actions.onRemoveItem(item.id) }
                     )
+                }
+
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedButton(onClick = actions.onAddFood) { Text("+ Add food") }
+                        FilterChip(
+                            selected = uiState.hasAddedOil,
+                            onClick = actions.onToggleOil,
+                            label = { Text(if (uiState.hasAddedOil) "Oil/butter +120 kcal" else "Add oil/butter (1 tbsp)") }
+                        )
+                    }
                 }
 
                 if (!uiState.notes.isNullOrBlank()) {
                     item {
-                        Text(
-                            text = "Note: ${uiState.notes}",
-                            style = KaloTypography.bodyMedium,
-                            color = KaloTextMuted,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
+                        Text("AI note: ${uiState.notes}", style = KaloTypography.bodyMedium, color = KaloTextMuted)
                     }
+                }
+
+                item {
+                    OutlinedTextField(
+                        value = uiState.userNote,
+                        onValueChange = actions.onNoteChange,
+                        label = { Text("Tell the AI more (optional)") },
+                        placeholder = { Text("e.g. half portion, 2 tbsp oil, skim milk") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    TextButton(
+                        onClick = actions.onReanalyze,
+                        enabled = !uiState.isAnalyzing
+                    ) { Text(if (uiState.isAnalyzing) "Re-analyzing..." else "Re-analyze photo with this note") }
+                    Text(
+                        "Estimates from a photo can be off by 20-30%. Edit any name or weight above.",
+                        style = KaloTypography.bodyMedium,
+                        color = KaloTextMuted
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
 
-            // Save Action
             KaloButton(
                 text = "Log Meal (${uiState.totalCalories} kcal)",
-                onClick = onSaveMeal,
+                onClick = actions.onSave,
                 loading = uiState.isSaving,
                 enabled = !uiState.isSaving && !uiState.isAnalyzing && uiState.items.isNotEmpty()
             )
@@ -127,65 +166,50 @@ fun MealReviewBottomSheet(
 }
 
 @Composable
-fun ItemWeightRow(
+fun EditableItemRow(
     item: EditableFoodItem,
-    onDecrement: () -> Unit,
-    onIncrement: () -> Unit,
+    onNameChange: (String) -> Unit,
+    onGramsChange: (Float) -> Unit,
+    onRemove: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
+    // Local text so partially typed numbers (e.g. "1", "12.") are not fought by the model value.
+    var gramsText by remember(item.id) { mutableStateOf(item.portionGrams.toInt().toString()) }
+
+    Column(
         modifier = modifier
             .fillMaxWidth()
             .background(KaloSurfaceElevated, RoundedCornerShape(14.dp))
-            .padding(14.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = item.name,
-                style = KaloTypography.titleMedium,
-                color = KaloTextPrimary
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = item.name,
+                onValueChange = onNameChange,
+                singleLine = true,
+                label = { Text("Food") },
+                modifier = Modifier.weight(1f)
             )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = "${item.currentCalories} kcal • ${item.currentProtein.toInt()}g P",
-                style = KaloTypography.bodyMedium,
-                color = KaloTextSecondary
+            OutlinedTextField(
+                value = gramsText,
+                onValueChange = { text ->
+                    gramsText = text.filter { it.isDigit() || it == '.' }.take(6)
+                    gramsText.toFloatOrNull()?.takeIf { it > 0f }?.let(onGramsChange)
+                },
+                singleLine = true,
+                label = { Text("Grams") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.width(96.dp)
             )
-        }
-
-        // Stepper buttons
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            IconButton(
-                onClick = onDecrement,
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(KaloSurface)
-            ) {
-                Text(text = "−", style = KaloTypography.titleLarge, color = KaloTextPrimary)
-            }
-
-            Text(
-                text = "${item.portionGrams.toInt()}g",
-                style = KaloTypography.titleMedium,
-                color = KaloTextPrimary,
-                modifier = Modifier.widthIn(min = 45.dp)
-            )
-
-            IconButton(
-                onClick = onIncrement,
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(KaloSurface)
-            ) {
-                Text(text = "+", style = KaloTypography.titleLarge, color = KaloTextPrimary)
+            IconButton(onClick = onRemove) {
+                Icon(Icons.Default.Close, contentDescription = "Remove ${item.name}", tint = KaloTextMuted)
             }
         }
+        Text(
+            text = "${item.currentCalories} kcal • ${item.currentProtein.toInt()}g P • ${item.currentCarbs.toInt()}g C • ${item.currentFat.toInt()}g F",
+            style = KaloTypography.bodyMedium,
+            color = KaloTextSecondary
+        )
     }
 }

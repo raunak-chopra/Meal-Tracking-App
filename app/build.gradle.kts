@@ -6,9 +6,13 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 android {
     namespace = "com.kalotracker.app"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.kalotracker.app"
@@ -47,6 +51,11 @@ android {
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
             "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi"
         )
+    }
+
+    sourceSets {
+        getByName("androidTest").assets.srcDir("$projectDir/schemas")
+        getByName("test").resources.srcDir("$projectDir/schemas")
     }
 
     buildFeatures {
@@ -91,6 +100,9 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
 
+    // CameraX exposes ListenableFuture (Guava) in its public API
+    implementation("com.google.guava:guava:33.3.1-android")
+
     // Google ML Kit Barcode Scanning (On-Device, Offline)
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
 
@@ -103,17 +115,12 @@ dependencies {
     // Image loading (Coil)
     implementation("io.coil-kt:coil-compose:2.7.0")
 
-    // Supabase Kotlin SDK
-    val supabaseVersion = "2.5.4"
-    implementation("io.github.jan-tennert.supabase:postgrest-kt:$supabaseVersion")
-    implementation("io.github.jan-tennert.supabase:storage-kt:$supabaseVersion")
-    implementation("io.github.jan-tennert.supabase:auth-kt:$supabaseVersion")
-    implementation("io.github.jan-tennert.supabase:functions-kt:$supabaseVersion")
-    implementation("io.ktor:ktor-client-android:2.3.12")
-
     // Kotlinx Serialization & Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    // WorkManager (daily logging reminder)
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 
     // Jetpack Glance Home Screen Widget
     val glanceVersion = "1.1.0"
@@ -122,5 +129,7 @@ dependencies {
 
     // Unit Testing
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.xerial:sqlite-jdbc:3.46.1.0")
+    testImplementation("org.json:json:20240303")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
 }

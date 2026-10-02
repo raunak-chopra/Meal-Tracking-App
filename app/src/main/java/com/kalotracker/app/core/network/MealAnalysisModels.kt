@@ -11,24 +11,25 @@ data class DetectedFoodItem(
     @SerialName("protein") val protein: Float,
     @SerialName("carbs") val carbs: Float,
     @SerialName("fat") val fat: Float,
-    @SerialName("confidence") val confidence: Float = 0.9f
+    @SerialName("confidence") val confidence: Float = 0.7f
 )
 
+/** Raw model output. Totals are intentionally not part of it; they are computed from items. */
 @Serializable
 data class MealAnalysisResponse(
-    @SerialName("meal_title") val mealTitle: String,
-    @SerialName("items") val items: List<DetectedFoodItem>,
-    @SerialName("total_calories") val totalCalories: Int,
-    @SerialName("total_protein") val totalProtein: Float,
-    @SerialName("total_carbs") val totalCarbs: Float,
-    @SerialName("total_fat") val totalFat: Float,
-    @SerialName("confidence") val confidence: Float = 0.85f,
+    @SerialName("is_food") val isFood: Boolean = true,
+    @SerialName("meal_title") val mealTitle: String = "",
+    @SerialName("items") val items: List<DetectedFoodItem> = emptyList(),
+    @SerialName("confidence") val confidence: Float = 0.7f,
     @SerialName("estimation_notes") val estimationNotes: String? = null
 )
 
-@Serializable
-data class MealAnalysisRequest(
-    @SerialName("image_base64") val imageBase64: String,
-    @SerialName("has_added_oil") val hasAddedOil: Boolean = false,
-    @SerialName("user_note") val userNote: String? = null
-)
+sealed class MealAnalysisException(message: String) : Exception(message) {
+    class NotConfigured : MealAnalysisException("Add your Gemini API key in Settings to scan meals.")
+    class Offline : MealAnalysisException("No internet connection. You can still log this meal manually.")
+    class NotFood : MealAnalysisException("No food detected in this photo. Try a closer, well-lit shot.")
+    class BadKey(detail: String) : MealAnalysisException("Gemini rejected the request: $detail")
+    class RateLimited : MealAnalysisException("Gemini rate limit reached. Wait a minute and try again.")
+    class BadResponse(detail: String) : MealAnalysisException("Couldn't read the AI response ($detail). Try again.")
+    class Other(detail: String) : MealAnalysisException(detail)
+}

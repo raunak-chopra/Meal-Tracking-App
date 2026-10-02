@@ -47,8 +47,11 @@ class MainActivity : ComponentActivity() {
                     mealRepository = app.mealRepository,
                     workoutRepository = app.workoutRepository,
                     userProfileRepository = app.userProfileRepository,
-                    authRepository = app.authRepository,
+                    appSettings = app.appSettings,
+                    analysisService = app.analysisService,
                     waterRepository = app.waterRepository,
+                    weightRepository = app.weightRepository,
+                    backupManager = app.backupManager,
                     healthConnectManager = app.healthConnectManager,
                     onOpenHealthPermissions = { requestHealthPermissions() },
                     startDestination = startDestination

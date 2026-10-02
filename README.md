@@ -1,95 +1,80 @@
-# Kalo — Minimal AI Meal, Workout & Step Tracker
+# Kalo — Android meal, workout & progress tracker
 
-**Kalo** is a minimalist, high-utility native Android health app built with **Kotlin**, **Jetpack Compose**, **Android Health Connect**, and **Supabase (Edge Functions + Google Gemini Vision)** following clean architecture and the "Nordic / Japanese Utilitarian" aesthetic (*Eat. Move. Glance. Repeat.*).
+Kalo is a native Android app (Kotlin, Jetpack Compose, Room) for one person: log food by photo, barcode or
+search, log workouts and water, and see whether your habits are moving you toward your goal.
 
----
+**Local-only by design.** All data is stored on the phone. There are no accounts and no server. The only
+network calls are (1) Google Gemini, when you scan a meal photo or ask for an AI summary, using *your own*
+API key, and (2) Open Food Facts, for barcode lookups.
 
-## What's New & Upgraded
+## Features
 
-- 📸 **CameraX & Image Compression Pipeline**: Captured photos are downsampled to max 1024px and compressed as JPEG to prevent Out-Of-Memory (OOM) errors, saved to app internal storage for thumbnails in the activity stream, and Base64 encoded for Gemini Vision. Also supports picking food photos directly from the gallery.
-- 📅 **Date Horizon Navigation**: Interactive date stepper on the dashboard (`< Yesterday`, `Tomorrow >`, `Jump to Today`) allows browsing and reviewing full meal and workout histories across any day.
-- 🥗 **Manual Food Log & USDA Food Catalog**: Offline verified database with common healthy foods (chicken breast, salmon, oats, eggs, rice, avocado, Greek yogurt, etc.). Calculate calories and macros dynamically by gram portion, or log meals without taking photos.
-- 💡 **AI Dietitian Daily Insights**: Smart engine that provides real-time personalized insights based on your daily macronutrient pacing, protein deficits, and post-workout glycogen recovery.
-- 🏋️ **Upgraded Workout Logger**: Popular exercise quick selector chips with automatic retrieval and pre-fill of your previous session's weight and reps (`getLastSessionSetsForExercise`), custom duration and calories burned calculation, and set deletion.
-- 🎯 **Goals & Settings Horizon**: Customize daily target calories, protein, carbs, fat, and step goals with 1-tap macro presets (High Protein 40/35/25, Balanced 30/45/25, Low Carb, Keto) and manual entry.
-- ☁️ **Repository Pattern & Supabase Cloud Sync**: `MealRepository`, `WorkoutRepository`, `UserProfileRepository`, and `AuthRepository` provide a single source of truth, offline-first caching via Room, and automatic/manual background synchronization to Supabase Postgres.
-- 🔐 **Authentication & Guest Mode**: Sign in with Supabase Auth or track immediately with zero barriers via Offline Guest Mode.
-- 👟 **Health Connect Integration**: Dedicated rationale and permissions screen, reading aggregated daily steps and active energy expenditure directly from Google Fit, Samsung Health, and smartwatches.
+- **AI meal scan** - photograph a meal (or pick from the gallery); Gemini estimates foods and portions.
+  Every name and weight is editable, you can add/remove foods, add a note and re-analyze, and set the meal
+  time. Nothing is saved until you confirm. If the key is missing, the photo is not food, or the network is
+  down, you get a clear message, never a made-up meal.
+- **Barcode scan** (on-device ML Kit + Open Food Facts). Unknown products or missing calorie data show
+  "not found" with scan-again / enter-manually, never invented values.
+- **Manual logging** from an 82-food catalog, with recent meals for one-tap re-logging.
+- **Edit and undo** - edit any logged meal, undo deletes, log a meal again.
+- **Workouts** with sets/reps, previous-session prefill and a progressive-overload hint.
+- **Water, goals and macro presets**, Health Connect steps and active calories, home-screen widget.
+- **Trends & coaching** - 7/30-day calorie and protein charts, streak, plain-language insights, weight log
+  with a goal-aware calorie-target check, optional AI weekly summary.
+- **Daily reminder** that only fires when the day looks under-logged.
+- **Your data** - JSON backup/import, CSV export, delete-all.
 
----
+## Setup
 
-## Architecture
+Requirements: JDK 17 and the Android SDK (compileSdk 35). Point Gradle at the SDK with `ANDROID_HOME` or a
+`local.properties` file containing `sdk.dir=...`.
 
-```
-[ CameraX / Gallery ] ──> [ ImageUtils (1024px JPEG) ] ──> [ Supabase Edge Function (Gemini 2.0 Flash) ]
-                                                                      │
-                                                                      ▼
-[ Food Catalog Search ] ──────> [ MealReview Sheet ] ──────> [ MealRepository ] ──> [ Supabase Cloud Sync ]
-                                                                      │
-                                                                      ▼
-                                                              [ Room Database ]
-                                                                      ▲
-                                                                      │
-[ Health Connect ] ───────> [ Step & Active Calorie Aggregates ] ─────┘
-```
-
-- **UI Layer (`feature/`)**: Modularized by feature (`dashboard`, `meal`, `workout`, `settings`, `health`, `auth`) using Jetpack Compose and unidirectional `StateFlow`.
-- **Domain & Repository Layer (`core/data/repository/`)**: `MealRepository`, `WorkoutRepository`, `UserProfileRepository`, and `AuthRepository`.
-- **Local Persistence (`core/database/`)**: Room database with relational tables, foreign key cascades, and reactive `Flow` queries.
-- **AI & Computer Vision (`supabase/functions/analyze-meal/`)**: Google Gemini 2.0 Flash with clinical prompt and strict JSON schema enforcement.
-
----
-
-## Project Structure
-
-```
-Meal Tracking App/
-├── docs/
-│   ├── BRANDING_AND_UIUX.md          # Design tokens, typography & UX philosophy
-│   └── ARCHITECTURE.md               # Architecture & subsystem integration guide
-├── app/
-│   ├── build.gradle.kts              # Compose, Health Connect, CameraX, Room, Supabase
-│   └── src/main/
-│       ├── AndroidManifest.xml       # Health Connect permissions & rationale declarations
-│       └── java/com/kalotracker/app/
-│           ├── core/
-│           │   ├── ai/               # AI Nutrition Insight Engine
-│           │   ├── data/
-│           │   │   ├── food/         # USDA verified food catalog
-│           │   │   └── repository/   # Meal, Workout, Profile & Auth Repositories
-│           │   ├── database/         # Room DB, DAOs & Entities (Meals, Sets, Workouts)
-│           │   ├── designsystem/     # OLED Dark theme, concentric rings, step gauge card
-│           │   ├── health/           # Health Connect Manager (Google Fit & Samsung Health)
-│           │   ├── network/          # Supabase client & Gemini Vision service
-│           │   └── util/             # ImageUtils downsampling & compression pipeline
-│           ├── feature/
-│           │   ├── auth/             # Sign In, Sign Up & Guest Mode
-│           │   ├── dashboard/        # Daily Horizon screen, date stepper & insight card
-│           │   ├── health/           # Health Connect permissions rationale screen
-│           │   ├── meal/             # CameraX viewfinder, review sheet & manual food log
-│           │   ├── settings/         # Goals, macro split presets & cloud sync
-│           │   └── workout/          # Multi-exercise set & rep logger with session history
-│           └── navigation/           # Compose NavHost & destination routes
-├── supabase/
-│   ├── functions/analyze-meal/       # Gemini Flash Edge Function with JSON Schema enforcement
-│   └── migrations/                   # Cloud sync schema & RLS policies
+```bash
+./gradlew testDebugUnitTest assembleDebug     # build + tests
+./gradlew installDebug                        # install on a connected phone (USB debugging on)
 ```
 
----
+The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk` and can also be sideloaded by
+copying it to the phone.
 
-## Configuration & Getting Started
+### Turn on photo scanning
+1. Create a free key at <https://aistudio.google.com/apikey>.
+2. In the app: Settings > AI meal scanning > paste the key > **Save & test**.
 
-### 1. Android Studio Setup
-1. Open Android Studio (Ladybug / Iguana or later).
-2. Open directory: `C:\Users\raunak.chopra\Desktop\Al Bots\Meal Tracking App`.
-3. Allow Gradle to sync.
+The key is stored only in the app's private storage. The default model is the rolling alias
+`gemini-flash-latest`; you can change it in Settings if Google retires or renames a model.
 
-### 2. Supabase & Gemini Setup
-1. Deploy the Edge Function:
-   ```bash
-   cd supabase
-   supabase functions deploy analyze-meal --no-verify-jwt
-   supabase secrets set GEMINI_API_KEY="your-gemini-api-key"
-   ```
-2. Update your Supabase URL & Anon Key in [SupabaseModule.kt](file:///C:/Users/raunak.chopra/Desktop/Al%20Bots/Meal%20Tracking%20App/app/src/main/java/com/kalotracker/app/core/network/SupabaseModule.kt).
-*(Note: A realistic mock fallback is included out-of-the-box so you can run and test the app immediately without configuring backend keys).*
+## Project layout
+
+```
+app/src/main/java/com/kalotracker/app/
+  core/
+    ai/           NutritionInsightEngine, TrendAnalyzer, GoalAdvisor, OverloadCoach (pure, unit-tested)
+    data/         food catalog, repositories, backup (BackupCodec/BackupManager)
+    database/     Room database, DAOs, entities, Migrations
+    health/       Health Connect
+    network/      MealAnalysisService (Gemini), OpenFoodFactsService
+    reminder/     WorkManager reminder
+    settings/     AppSettings (API key, model, reminder)
+  feature/        dashboard, meal, barcode, workout, trends, settings, health, widget
+app/schemas/      exported Room schemas (used by the migration test)
+```
+
+## Database changes
+
+Room exports its schema to `app/schemas/`. Never use a destructive migration: bump the version, write a
+`Migration` in `Migrations.kt`, and extend `MigrationTest` (it runs on the JVM against the exported
+schemas and checks that data survives and the structure matches a fresh database).
+
+## Design docs
+
+- [docs/BRANDING_AND_UIUX.md](docs/BRANDING_AND_UIUX.md) - visual language
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - original architecture notes (the cloud-sync parts are no longer applicable)
+
+## Releases and contributions
+
+Every completed app upgrade updates both Android version fields and [CHANGELOG.md](CHANGELOG.md). Pull requests run tests, lint and build checks. A validated version upgrade merged to main publishes a version tag and source release.
+
+Start with [the GitHub guide](docs/GITHUB_GUIDE.md) and [release checklist](docs/RELEASING.md). Use fictional data in reports and read [security and privacy guidance](SECURITY.md).
+
+Licensed under the [MIT License](LICENSE).

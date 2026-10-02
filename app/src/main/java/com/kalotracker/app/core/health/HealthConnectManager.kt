@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.StepsRecord
-import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
+import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import java.time.Instant
@@ -36,7 +36,7 @@ class HealthConnectManager(private val context: Context) {
 
     val permissions = setOf(
         HealthPermission.getReadPermission(StepsRecord::class),
-        HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class)
+        HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class)
     )
 
     fun checkAvailability(): HealthConnectAvailability {
@@ -54,18 +54,23 @@ class HealthConnectManager(private val context: Context) {
     }
 
     /**
-     * Reads aggregated steps and total calories burned from today's start of day (midnight) to now.
+     * Reads aggregated steps and active calories burned from today's start of day (midnight) to now.
      */
     suspend fun readTodayHealthData(): HealthDataSummary {
         return readHealthDataForDate(LocalDate.now())
     }
 
     /**
-     * Reads aggregated steps and total calories burned for any specific date.
+     * Reads aggregated steps and ACTIVE calories burned (excludes resting metabolism) for a date.
      * If date is today, queries up to Instant.now(); otherwise queries the full 24-hour window.
      */
     suspend fun readHealthDataForDate(date: LocalDate): HealthDataSummary {
-        val client = healthConnectClient ?: return HealthDataSummary(isConnected = false)
+        val client = healthConnectClient
+            ?: return HealthDataSummary(isConnected = false, syncSource = "Health Connect unavailable")
+
+        if (!hasAllPermissions()) {
+            return HealthDataSummary(isConnected = false, syncSource = "Permission needed")
+        }
 
         val zoneId = ZoneId.systemDefault()
         val startOfDay = date.atStartOfDay(zoneId).toInstant()
@@ -80,27 +85,27 @@ class HealthConnectManager(private val context: Context) {
                 AggregateRequest(
                     metrics = setOf(
                         StepsRecord.COUNT_TOTAL,
-                        TotalCaloriesBurnedRecord.ENERGY_TOTAL
+                        ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL
                     ),
                     timeRangeFilter = TimeRangeFilter.between(startOfDay, endOfDay)
                 )
             )
 
             val steps = response[StepsRecord.COUNT_TOTAL] ?: 0L
-            val energy = response[TotalCaloriesBurnedRecord.ENERGY_TOTAL]?.inKilocalories ?: 0.0
+            val energy = response[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories ?: 0.0
 
             HealthDataSummary(
                 steps = steps,
                 activeCaloriesBurned = energy,
                 isConnected = true,
-                syncSource = "Samsung Health & Google Fit"
+                syncSource = "Health Connect"
             )
         } catch (e: Exception) {
             HealthDataSummary(
                 steps = 0L,
                 activeCaloriesBurned = 0.0,
                 isConnected = false,
-                syncSource = "Sync Error: ${e.localizedMessage}"
+                syncSource = "Couldn't read Health Connect"
             )
         }
     }

@@ -20,8 +20,19 @@ interface WorkoutDao {
     @Query("SELECT * FROM workouts WHERE timestamp >= :startOfDay AND timestamp <= :endOfDay ORDER BY timestamp DESC")
     fun getWorkoutsForDay(startOfDay: Long, endOfDay: Long): Flow<List<WorkoutWithSets>>
 
+    @Transaction
+    @Query("SELECT * FROM workouts WHERE timestamp >= :start AND timestamp <= :end ORDER BY timestamp ASC")
+    suspend fun getWorkoutsBetween(start: Long, end: Long): List<WorkoutWithSets>
+
+    @Transaction
+    @Query("SELECT * FROM workouts ORDER BY timestamp ASC")
+    suspend fun getAllWorkouts(): List<WorkoutWithSets>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWorkout(workout: WorkoutEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertWorkouts(workouts: List<WorkoutEntity>)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertExerciseSets(sets: List<ExerciseSetEntity>)
@@ -32,15 +43,21 @@ interface WorkoutDao {
         insertExerciseSets(sets)
     }
 
-    @Query("SELECT * FROM exercise_sets WHERE exerciseName = :exerciseName ORDER BY id DESC LIMIT :limit")
-    suspend fun getLastSessionSetsForExercise(exerciseName: String, limit: Int = 5): List<ExerciseSetEntity>
-
-    @Query("SELECT * FROM workouts WHERE syncStatus = 'PENDING'")
-    suspend fun getPendingSyncWorkouts(): List<WorkoutEntity>
-
-    @Transaction
-    @Query("SELECT * FROM workouts WHERE syncStatus = 'PENDING'")
-    suspend fun getPendingSyncWorkoutsWithSets(): List<WorkoutWithSets>
+    /** Sets from the most recent workout (by time) that contained this exercise. */
+    @Query(
+        """
+        SELECT s.* FROM exercise_sets s
+        WHERE s.exerciseName = :exerciseName COLLATE NOCASE
+          AND s.workoutId = (
+            SELECT w.id FROM workouts w
+            JOIN exercise_sets s2 ON s2.workoutId = w.id
+            WHERE s2.exerciseName = :exerciseName COLLATE NOCASE
+            ORDER BY w.timestamp DESC LIMIT 1
+          )
+        ORDER BY s.setNumber ASC
+        """
+    )
+    suspend fun getLastSessionSetsForExercise(exerciseName: String): List<ExerciseSetEntity>
 
     @Delete
     suspend fun deleteWorkout(workout: WorkoutEntity)
@@ -48,6 +65,9 @@ interface WorkoutDao {
     @Query("DELETE FROM exercise_sets WHERE workoutId = :workoutId")
     suspend fun deleteExerciseSetsByWorkoutId(workoutId: String)
 
-    @Update
-    suspend fun updateWorkout(workout: WorkoutEntity)
+    @Query("DELETE FROM exercise_sets")
+    suspend fun deleteAllExerciseSets()
+
+    @Query("DELETE FROM workouts")
+    suspend fun deleteAllWorkouts()
 }
