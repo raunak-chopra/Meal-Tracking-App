@@ -4,7 +4,7 @@
 
 - Keep this repository public, with personal records and credentials outside Git.
 - Use MIT if you want others to freely use and modify the app, including commercially.
-  A license is an owner decision; select it before a LICENSE file is published.
+  This repository uses the MIT License; retain its notice when redistributing code.
 - Protect `main`: require a pull request and the `verify` check, block force pushes
   and branch deletion. As a solo maintainer, require zero external approvals.
 - Enable secret scanning, push protection, private vulnerability reporting and

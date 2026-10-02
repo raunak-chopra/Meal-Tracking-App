@@ -22,7 +22,7 @@ stable upgrade channel: their signing identity may change between runners.
 - Push these workflow files to GitHub and enable Actions if disabled.
 - Protect `main` with a rule requiring the `verify` check and pull requests.
 - Enable available secret scanning/push protection in repository settings.
-- Choose a source license and add a LICENSE file before advertising the project as open source.
+- The project uses the MIT License; retain the LICENSE notice in redistributions.
 - Use a verified GitHub noreply address for future commits if you do not want your email public.
   Existing commit metadata is unchanged; removing an already published email requires coordinated history rewriting.
 - Keep API keys and Android signing keys outside Git. Rotate any credential ever published;
