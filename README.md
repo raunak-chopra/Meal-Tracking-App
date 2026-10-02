@@ -1,4 +1,4 @@
-# Kalo - personal meal, workout & progress tracker
+# Kalo — Android meal, workout & progress tracker
 
 Kalo is a native Android app (Kotlin, Jetpack Compose, Room) for one person: log food by photo, barcode or
 search, log workouts and water, and see whether your habits are moving you toward your goal.
@@ -70,3 +70,11 @@ schemas and checks that data survives and the structure matches a fresh database
 
 - [docs/BRANDING_AND_UIUX.md](docs/BRANDING_AND_UIUX.md) - visual language
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - original architecture notes (the cloud-sync parts are no longer applicable)
+
+## Releases and contributions
+
+Every completed app upgrade updates both Android version fields and [CHANGELOG.md](CHANGELOG.md). Pull requests run tests, lint and build checks. A validated version upgrade merged to main publishes a version tag and source release.
+
+Start with [the GitHub guide](docs/GITHUB_GUIDE.md) and [release checklist](docs/RELEASING.md). Use fictional data in reports and read [security and privacy guidance](SECURITY.md).
+
+Licensed under the [MIT License](LICENSE).
