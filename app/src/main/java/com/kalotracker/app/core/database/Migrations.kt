@@ -4,7 +4,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 object Migrations {
-    val ALL: Array<Migration> get() = arrayOf(MIGRATION_2_3)
+    val ALL: Array<Migration> get() = arrayOf(MIGRATION_2_3, MIGRATION_3_4)
 
     /**
      * v2 -> v3: drops the unused cloud-sync columns (meals.imageRemoteUrl, meals.syncStatus,
@@ -47,5 +47,17 @@ object Migrations {
 
         // new table
         "CREATE TABLE IF NOT EXISTS `weight_logs` (`id` TEXT NOT NULL, `weightKg` REAL NOT NULL, `timestamp` INTEGER NOT NULL, PRIMARY KEY(`id`))"
+    )
+
+    val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) { MIGRATION_3_4_SQL.forEach { db.execSQL(it) } }
+    }
+    internal val MIGRATION_3_4_SQL = listOf(
+        "ALTER TABLE `workouts` ADD COLUMN `exercisesJson` TEXT NOT NULL DEFAULT '[]'",
+        "CREATE TABLE IF NOT EXISTS `day_status` (`date` TEXT NOT NULL, `complete` INTEGER NOT NULL, PRIMARY KEY(`date`))",
+        "CREATE TABLE IF NOT EXISTS `goal_history` (`date` TEXT NOT NULL, `calories` INTEGER NOT NULL, `protein` INTEGER NOT NULL, `carbs` INTEGER NOT NULL, `fat` INTEGER NOT NULL, `waterMl` INTEGER NOT NULL, `goal` TEXT NOT NULL, PRIMARY KEY(`date`))",
+        "CREATE TABLE IF NOT EXISTS `saved_foods` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `kind` TEXT NOT NULL, `yieldGrams` REAL NOT NULL, `calories` INTEGER NOT NULL, `protein` REAL NOT NULL, `carbs` REAL NOT NULL, `fat` REAL NOT NULL, `favorite` INTEGER NOT NULL, `ingredientsJson` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "CREATE TABLE IF NOT EXISTS `barcode_cache` (`barcode` TEXT NOT NULL, `payload` TEXT NOT NULL, `cachedAt` INTEGER NOT NULL, PRIMARY KEY(`barcode`))",
+        "CREATE TABLE IF NOT EXISTS `workout_routines` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `payload` TEXT NOT NULL, PRIMARY KEY(`id`))"
     )
 }

@@ -32,10 +32,12 @@ import com.kalotracker.app.core.designsystem.components.KaloButton
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
+    appSettings: com.kalotracker.app.core.settings.AppSettings,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+    val appearance by appSettings.appearance.collectAsState()
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -52,7 +54,7 @@ fun SettingsScreen(
                 IconButton(
                     onClick = onBack,
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
                         .background(KaloSurfaceElevated)
                 ) {
@@ -64,12 +66,12 @@ fun SettingsScreen(
                 }
 
                 Text(
-                    text = "SETTINGS & GOALS",
-                    style = KaloTypography.labelSmall,
+                    text = "Settings",
+                    style = KaloTypography.titleLarge,
                     color = KaloTextSecondary
                 )
 
-                Box(modifier = Modifier.size(40.dp))
+                Box(modifier = Modifier.size(48.dp))
             }
         },
         bottomBar = {
@@ -82,8 +84,7 @@ fun SettingsScreen(
                 KaloButton(
                     text = "Save Goals",
                     onClick = {
-                        viewModel.saveGoals()
-                        onBack()
+                        if (viewModel.saveGoals()) onBack()
                     }
                 )
             }
@@ -97,6 +98,19 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(20.dp),
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
+            state.goalError?.let { message ->
+                item { Text(message, color = MaterialTheme.colorScheme.error) }
+            }
+            item {
+                Text("Appearance", style = KaloTypography.titleLarge)
+                Column { com.kalotracker.app.core.settings.Appearance.entries.forEach { mode ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = appearance == mode, onClick = { appSettings.saveAppearance(mode) })
+                        TextButton(onClick = { appSettings.saveAppearance(mode) }) { Text(mode.name.lowercase().replaceFirstChar { it.uppercase() }) }
+                    }
+                }
+            }
+            }
             // Section: Macro Split Presets
             item {
                 Column {
@@ -423,7 +437,8 @@ private fun ReminderSection(state: SettingsUiState, viewModel: SettingsViewModel
 
 @Composable
 private fun DataSection(state: SettingsUiState, viewModel: SettingsViewModel) {
-    val resolver = androidx.compose.ui.platform.LocalContext.current.contentResolver
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val resolver = context.contentResolver
     var confirmDelete by remember { mutableStateOf(false) }
     val today = java.time.LocalDate.now()
 
@@ -431,13 +446,19 @@ private fun DataSection(state: SettingsUiState, viewModel: SettingsViewModel) {
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
     ) { uri -> if (uri != null) viewModel.exportBackup(uri, resolver) }
 
+    val archiveLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri -> if (uri != null) viewModel.exportArchive(uri, resolver) }
+    val folderLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree()
+    ) { uri -> if (uri != null) viewModel.chooseBackupFolder(uri, resolver, context) }
     val csvLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/csv")
     ) { uri -> if (uri != null) viewModel.exportMealsCsv(uri, resolver) }
 
     val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
-    ) { uri -> if (uri != null) viewModel.importBackup(uri, resolver) }
+    ) { uri -> if (uri != null) viewModel.previewImport(uri, resolver) }
 
     Column(
         modifier = Modifier.fillMaxWidth().background(KaloSurface, RoundedCornerShape(16.dp)).padding(16.dp),
@@ -445,8 +466,8 @@ private fun DataSection(state: SettingsUiState, viewModel: SettingsViewModel) {
     ) {
         Text("YOUR DATA", style = KaloTypography.labelSmall, color = KaloTextSecondary)
         Text(
-            "Everything lives only on this phone. The one exception: when you scan a meal photo, that photo is sent to Google Gemini for analysis. " +
-                "There is no cloud backup, so export a file now and then (photos are not included).",
+            "Logs are stored on this phone without an account. Optional Gemini analysis sends your selected photo or trend summary; barcode lookup sends the barcode to Open Food Facts. " +
+                "Complete ZIP archives include photos and your library. JSON is a smaller data-only backup. Automatic backups use the folder you choose; a cloud-backed folder may be synced by its provider.",
             style = KaloTypography.bodyMedium,
             color = KaloTextMuted
         )
@@ -459,6 +480,11 @@ private fun DataSection(state: SettingsUiState, viewModel: SettingsViewModel) {
             )
         }
 
+        OutlinedButton(onClick = { archiveLauncher.launch("kalo-complete-$today.zip") }, enabled = !state.dataBusy, modifier = Modifier.fillMaxWidth()) { Text("Export complete archive (photos included)") }
+        OutlinedButton(onClick = { folderLauncher.launch(null) }, modifier = Modifier.fillMaxWidth()) { Text("Choose automatic backup folder") }
+        Row { Switch(checked = state.backupSchedule.enabled, onCheckedChange = { viewModel.enableBackup(it, context) }, enabled = state.backupSchedule.folder.isNotBlank()); Text("Daily dated backups (battery permitting)") }
+        Text(if (state.backupSchedule.lastSuccess > 0) "Last backup: ${java.time.Instant.ofEpochMilli(state.backupSchedule.lastSuccess).atZone(java.time.ZoneId.systemDefault())}" else "No automatic backup completed yet.")
+        state.backupSchedule.error?.let { Text("Backup failed: $it") }
         OutlinedButton(
             onClick = { backupLauncher.launch("kalo-backup-$today.json") },
             enabled = !state.dataBusy,
@@ -485,12 +511,16 @@ private fun DataSection(state: SettingsUiState, viewModel: SettingsViewModel) {
         ) { Text("Delete all my data") }
     }
 
+    state.restorePreview?.let { preview -> AlertDialog(onDismissRequest = viewModel::cancelRestore,
+        title = { Text("Restore preview") }, text = { Text(preview) },
+        confirmButton = { TextButton(onClick = { viewModel.confirmRestore() }, enabled = !state.dataBusy) { Text("Import") } },
+        dismissButton = { TextButton(onClick = viewModel::cancelRestore, enabled = !state.dataBusy) { Text("Cancel") } }) }
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text("Delete everything?") },
             text = {
-                Text("This permanently deletes all meals, workouts, water and weight entries and meal photos on this phone. Your goals and API key stay. Export a backup first if you might want this back.")
+                Text("This permanently deletes all logs, meal photos, foods, recipes, routines, barcode cache and day/goal history on this phone. Your current goals and API key stay. Existing exported backups stay in their folders. Export a backup first if you might want this back.")
             },
             confirmButton = {
                 TextButton(onClick = {

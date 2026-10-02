@@ -1,10 +1,10 @@
 # Kalo — Android meal, workout & progress tracker
 
-Kalo is a native Android app (Kotlin, Jetpack Compose, Room) for one person: log food by photo, barcode or
+Kalo is a native Android app (Kotlin, Jetpack Compose, Room) for personal tracking: log food by photo, barcode or
 search, log workouts and water, and see whether your habits are moving you toward your goal.
 
-**Local-only by design.** All data is stored on the phone. There are no accounts and no server. The only
-network calls are (1) Google Gemini, when you scan a meal photo or ask for an AI summary, using *your own*
+**Local storage by design.** Tracking records are stored on the phone. There are no accounts or app backend. The
+external services are (1) Google Gemini, when you scan a meal photo or ask for an AI summary, using *your own*
 API key, and (2) Open Food Facts, for barcode lookups.
 
 ## Features
@@ -17,12 +17,13 @@ API key, and (2) Open Food Facts, for barcode lookups.
   "not found" with scan-again / enter-manually, never invented values.
 - **Manual logging** from an 82-food catalog, with recent meals for one-tap re-logging.
 - **Edit and undo** - edit any logged meal, undo deletes, log a meal again.
-- **Workouts** with sets/reps, previous-session prefill and a progressive-overload hint.
+- **Workouts** with multiple exercises, saved routines, editing, set completion, a rest timer, previous-session prefill and a progressive-overload hint.
 - **Water, goals and macro presets**, Health Connect steps and active calories, home-screen widget.
 - **Trends & coaching** - 7/30-day calorie and protein charts, streak, plain-language insights, weight log
-  with a goal-aware calorie-target check, optional AI weekly summary.
+  with historical daily goals and evidence-gated calorie-target checks, optional AI weekly summary. Mark fully logged days complete on the dashboard; averages exclude partial/missing days and today.
 - **Daily reminder** that only fires when the day looks under-logged.
-- **Your data** - JSON backup/import, CSV export, delete-all.
+- **Personal foods** - label values, favorites, editable templates, recipes with cooked yield, quick kcal/protein estimates and direct nutrition corrections. Previously looked-up barcodes work from a local cache.
+- **Your data** - photo-inclusive ZIP archives, daily dated backups to a chosen folder, restore preview/merge, JSON backup/import, CSV export and delete-all. API keys and folder grants are excluded from exports.
 
 ## Setup
 
@@ -60,6 +61,16 @@ app/src/main/java/com/kalotracker/app/
 app/schemas/      exported Room schemas (used by the migration test)
 ```
 
+## Instrumented integration checks
+
+`assembleDebugAndroidTest` builds a dependency-free instrumentation runner. On a disposable emulator, install both debug APKs and run:
+
+```bash
+adb -s emulator-5554 shell am instrument -w com.kalotracker.app.test/com.kalotracker.app.IntegrationRunner
+```
+
+It uses disposable databases/photos/preferences for Room migration, archive/merge, barcode cache, workout replacement and goal persistence checks. Do not install a test build over a real personal-use installation without checking signing and making a complete backup.
+
 ## Database changes
 
 Room exports its schema to `app/schemas/`. Never use a destructive migration: bump the version, write a
@@ -71,10 +82,26 @@ schemas and checks that data survives and the structure matches a fresh database
 - [docs/BRANDING_AND_UIUX.md](docs/BRANDING_AND_UIUX.md) - visual language
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - original architecture notes (the cloud-sync parts are no longer applicable)
 
+See [phases 2–5 implementation and verification](docs/PHASES_2_5_IMPLEMENTATION.md) for implementation details and verification limitations. Local diff artifacts referenced in development reports are excluded from the public repository.
+
+## Appearance
+
+Warm Precision / Open Plate is applied with system/light/dark appearance, Today / Meals / Progress navigation and a shared Add meal chooser. Existing local records, personal foods, workout routines and full photo archives are retained. See [the gap-check and branding report](docs/BRANDING_AND_GAP_CHECK.md) for verification and remaining phone acceptance checks.
+
+## Everyday habits
+
+Photo meals now lead with approximate calories and optional portion adjustments; grams and macros are expandable. Daily fitness logs short bodyweight sessions with remembered choices. Photo-meal drafts recover locally. See [implementation and verification](docs/HABIT_TRACKING.md) for scope, review, evidence and device-testing limits.
+
 ## Releases and contributions
 
-Every completed app upgrade updates both Android version fields and [CHANGELOG.md](CHANGELOG.md). Pull requests run tests, lint and build checks. A validated version upgrade merged to main publishes a version tag and source release.
+Every completed app version upgrade updates both version fields and the [changelog](CHANGELOG.md).
+Pull requests run unit tests, lint and debug/test builds. After a validated version upgrade reaches
+`main`, GitHub Actions publishes its version tag and source release. See [the release checklist](docs/RELEASING.md).
+New to GitHub? Start with [the project GitHub guide](docs/GITHUB_GUIDE.md).
+The working tree can contain unreleased development features; use tagged releases to identify versions.
 
-Start with [the GitHub guide](docs/GITHUB_GUIDE.md) and [release checklist](docs/RELEASING.md). Use fictional data in reports and read [security and privacy guidance](SECURITY.md).
+Contributions should include relevant verification and fictional test data. Read [security and privacy guidance](SECURITY.md)
+before filing reports. Optional AI analysis sends selected images to Gemini; local backups can contain personal health records and photos.
 
-Licensed under the [MIT License](LICENSE).
+Source code is licensed under the [MIT License](LICENSE). Bundled Open Food Facts data
+retains its own licenses; see [third-party notices](THIRD_PARTY_NOTICES.md).

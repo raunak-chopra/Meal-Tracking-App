@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -53,12 +54,8 @@ fun TrendsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.size(40.dp).clip(CircleShape).background(KaloSurfaceElevated)
-                ) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = KaloTextPrimary) }
-                Text("TRENDS & COACHING", style = KaloTypography.labelSmall, color = KaloTextSecondary)
-                Box(Modifier.size(40.dp))
+                Text("Progress", style = KaloTypography.headlineMedium, color = KaloTextPrimary, modifier = Modifier.weight(1f))
+                IconButton(onClick=onOpenSettings,modifier=Modifier.size(48.dp)) { Icon(Icons.Default.Settings,"Settings",tint=KaloTextPrimary) }
             }
         }
     ) { padding ->
@@ -79,12 +76,24 @@ fun TrendsScreen(
                 }
             }
 
+            if (!state.isLoading) item {
+                Surface(shape = RoundedCornerShape(16.dp), color = KaloSurfaceElevated) {
+                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Your habits · last ${state.rangeDays} days", style = KaloTypography.titleLarge)
+                        Text("Meals recorded on ${state.habits.mealDays} days")
+                        Text("${state.habits.sessions} fitness sessions · ${state.habits.minutes} minutes")
+                        state.habits.reps.forEach { (exercise, reps) -> Text("$exercise · $reps completed reps") }
+                        Text("Recording a meal builds the habit. Mark a day complete only when all its food is logged; nutrition averages use complete past days.", style = KaloTypography.bodySmall)
+                    }
+                }
+            }
+
             val stats = state.stats
             if (stats != null) {
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                         StatTile("Streak", "${stats.streak}d", Modifier.weight(1f))
-                        StatTile("Logged", "${stats.loggedDays}/${state.rangeDays}", Modifier.weight(1f))
+                        StatTile("Complete", "${stats.loggedDays}/${state.rangeDays}", Modifier.weight(1f))
                         StatTile("Avg kcal", if (stats.loggedDays == 0) "-" else "${stats.avgCalories}", Modifier.weight(1f))
                         StatTile(
                             "Protein hit",
@@ -97,9 +106,10 @@ fun TrendsScreen(
                 item {
                     ChartCard(
                         title = "CALORIES PER DAY",
-                        subtitle = "Dashed line: your ${state.targets.calories} kcal target",
+                        subtitle = "Historical daily targets; faint bars are partial",
                         days = stats.days,
                         value = { it.calories.toFloat() },
+                        dailyTarget = { it.historicalTargets?.calories?.toFloat() },
                         target = state.targets.calories.toFloat(),
                         color = KaloCalories
                     )
@@ -107,9 +117,10 @@ fun TrendsScreen(
                 item {
                     ChartCard(
                         title = "PROTEIN PER DAY (G)",
-                        subtitle = "Dashed line: your ${state.targets.protein} g target",
+                        subtitle = "Historical daily targets; faint bars are partial",
                         days = stats.days,
                         value = { it.protein },
+                        dailyTarget = { it.historicalTargets?.protein?.toFloat() },
                         target = state.targets.protein.toFloat(),
                         color = KaloProtein
                     )
@@ -122,7 +133,7 @@ fun TrendsScreen(
                     ) {
                         Text("WHAT STANDS OUT", style = KaloTypography.labelSmall, color = KaloTextSecondary)
                         state.insights.forEach { line ->
-                            Text("•  $line", style = KaloTypography.bodyMedium, color = KaloTextPrimary)
+                            Text("·  $line", style = KaloTypography.bodyMedium, color = KaloTextPrimary)
                         }
                     }
                 }
@@ -152,6 +163,7 @@ private fun ChartCard(
     subtitle: String,
     days: List<DayTotals>,
     value: (DayTotals) -> Float,
+    dailyTarget: (DayTotals) -> Float?,
     target: Float,
     color: Color
 ) {
@@ -163,6 +175,7 @@ private fun ChartCard(
     ) {
         Text(title, style = KaloTypography.labelSmall, color = KaloTextSecondary)
         Text(subtitle, style = KaloTypography.bodyMedium, color = KaloTextMuted)
+        val targetLineColor = KaloTextSecondary
         Canvas(modifier = Modifier.fillMaxWidth().height(140.dp)) {
             val maxValue = maxOf(target * 1.25f, days.maxOfOrNull { value(it) } ?: 0f, 1f)
             val n = days.size.coerceAtLeast(1)
@@ -173,20 +186,19 @@ private fun ChartCard(
                 val h = (v / maxValue) * size.height
                 val left = i * slot + (slot - barWidth) / 2f
                 if (day.isLogged) {
-                    drawRect(color, topLeft = Offset(left, size.height - h), size = Size(barWidth, h))
+                    drawRect(if (day.complete) color else color.copy(alpha = 0.35f), topLeft = Offset(left, size.height - h), size = Size(barWidth, h))
                 } else {
                     // Unlogged day: thin stub so gaps are visible rather than looking like 0 intake.
                     drawRect(emptyColor, topLeft = Offset(left, size.height - 3.dp.toPx()), size = Size(barWidth, 3.dp.toPx()))
                 }
             }
-            val y = size.height - (target / maxValue) * size.height
-            drawLine(
-                color = KaloTextSecondary,
-                start = Offset(0f, y),
-                end = Offset(size.width, y),
-                strokeWidth = 1.5.dp.toPx(),
-                pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 10f))
-            )
+            days.forEachIndexed { i, day ->
+                dailyTarget(day)?.let { t ->
+                    val y = size.height - (t / maxValue) * size.height
+                    drawLine(targetLineColor, Offset(i * slot, y), Offset((i + 1) * slot, y),
+                        strokeWidth = 1.5.dp.toPx())
+                }
+            }
         }
         if (days.isNotEmpty()) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -231,6 +243,7 @@ private fun AiSummaryCard(state: TrendsUiState, viewModel: TrendsViewModel, onOp
                 if (!state.aiError.isNullOrBlank()) {
                     Text(state.aiError ?: "", style = KaloTypography.bodyMedium, color = KaloFat)
                 }
+                Text("Generating sends daily totals and goals to Google Gemini with your key. Saved records stay on this device.", style = KaloTypography.bodySmall, color = KaloTextSecondary)
                 OutlinedButton(onClick = { viewModel.generateAiSummary() }, enabled = !state.isSummarizing) {
                     Text(
                         when {
@@ -318,9 +331,10 @@ private fun WeightLineChart(oldestFirst: List<WeightLogEntity>) {
         val hi = values.max()
         val range = (hi - lo).coerceAtLeast(0.5f)
         val pad = 8.dp.toPx()
-        val stepX = if (values.size > 1) (size.width - 2 * pad) / (values.size - 1) else 0f
+        val firstTime = oldestFirst.first().timestamp
+        val span = (oldestFirst.last().timestamp - firstTime).coerceAtLeast(1L)
         fun point(i: Int) = Offset(
-            pad + i * stepX,
+            pad + ((oldestFirst[i].timestamp - firstTime).toDouble() / span).toFloat() * (size.width - 2 * pad),
             pad + (1f - (values[i] - lo) / range) * (size.height - 2 * pad)
         )
         for (i in 0 until values.size - 1) {

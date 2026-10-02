@@ -19,6 +19,10 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
+import com.kalotracker.app.core.designsystem.BrandPalette
+import com.kalotracker.app.core.designsystem.WarmDark
+import com.kalotracker.app.core.designsystem.WarmLight
+import com.kalotracker.app.core.designsystem.components.EnergyDisplay
 import com.kalotracker.app.MainActivity
 import com.kalotracker.app.core.database.KaloDatabase
 import java.time.LocalDate
@@ -34,15 +38,18 @@ class KaloWidget : GlanceAppWidget() {
         val startOfDay = today.atStartOfDay(zoneId).toInstant().toEpochMilli()
         val endOfDay = today.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli() - 1
 
+        var readFailed = false
         val meals = try {
             db.mealDao().getMealsForDayOnce(startOfDay, endOfDay)
-        } catch (_: Exception) {
+        } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel } catch (_: Exception) {
+            readFailed = true
             emptyList()
         }
 
         val totalWater = try {
             db.waterDao().getTotalWaterForDayOnce(startOfDay, endOfDay)
-        } catch (_: Exception) {
+        } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel } catch (_: Exception) {
+            readFailed = true
             0
         }
 
@@ -68,8 +75,12 @@ class KaloWidget : GlanceAppWidget() {
             putExtra("EXTRA_START_DESTINATION", "camera")
         }
 
+        val mode = context.getSharedPreferences("kalo_app_settings", Context.MODE_PRIVATE).getString("appearance", "SYSTEM")
+        val dark = mode == "DARK" || (mode == "SYSTEM" && context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES)
+        val palette = if(dark) WarmDark else WarmLight
         provideContent {
             GlanceWidgetContent(
+                palette = palette, readFailed = readFailed,
                 remainingCalories = remainingCalories,
                 consumedCalories = consumedCalories,
                 targetCalories = targetCalories,
@@ -90,6 +101,7 @@ class KaloWidget : GlanceAppWidget() {
 
 @Composable
 private fun GlanceWidgetContent(
+    palette: BrandPalette, readFailed: Boolean,
     remainingCalories: Int,
     consumedCalories: Int,
     targetCalories: Int,
@@ -109,7 +121,7 @@ private fun GlanceWidgetContent(
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(ColorProvider(Color(0xFF14161F)))
+            .background(ColorProvider(palette.background))
             .cornerRadius(20.dp)
             .padding(14.dp)
             .clickable(actionStartActivity(openAppIntent))
@@ -127,7 +139,7 @@ private fun GlanceWidgetContent(
                 Text(
                     text = "KALO",
                     style = TextStyle(
-                        color = ColorProvider(Color(0xFF38BDF8)),
+                        color = ColorProvider(palette.accent),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -136,7 +148,7 @@ private fun GlanceWidgetContent(
                 Text(
                     text = dateText,
                     style = TextStyle(
-                        color = ColorProvider(Color(0xFF94A3B8)),
+                        color = ColorProvider(palette.secondaryText),
                         fontSize = 11.sp
                     )
                 )
@@ -151,17 +163,17 @@ private fun GlanceWidgetContent(
             ) {
                 Column(modifier = GlanceModifier.defaultWeight()) {
                     Text(
-                        text = if (remainingCalories >= 0) "${remainingCalories} kcal" else "+${-remainingCalories} over",
+                        text = if(readFailed) "Logs unavailable" else "$consumedCalories kcal logged",
                         style = TextStyle(
-                            color = ColorProvider(if (remainingCalories >= 0) Color.White else Color(0xFFF43F5E)),
+                            color = ColorProvider(palette.text),
                             fontSize = 22.sp,
                             fontWeight = FontWeight.Bold
                         )
                     )
                     Text(
-                        text = if (remainingCalories >= 0) "remaining of $targetCalories" else "goal: $targetCalories",
+                        text = if(readFailed) "Open app to check" else EnergyDisplay(consumedCalories, targetCalories).deltaText,
                         style = TextStyle(
-                            color = ColorProvider(Color(0xFF64748B)),
+                            color = ColorProvider(palette.secondaryText),
                             fontSize = 11.sp
                         )
                     )
@@ -170,15 +182,16 @@ private fun GlanceWidgetContent(
                 // Snap Meal Action Button
                 Box(
                     modifier = GlanceModifier
-                        .background(ColorProvider(Color(0xFF38BDF8)))
+                        .background(ColorProvider(palette.accent))
                         .cornerRadius(12.dp)
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .height(48.dp)
+                        .padding(horizontal = 12.dp, vertical = 14.dp)
                         .clickable(actionStartActivity(snapMealIntent))
                 ) {
                     Text(
-                        text = "Snap Meal",
+                        text = "Add meal",
                         style = TextStyle(
-                            color = ColorProvider(Color(0xFF090A0F)),
+                            color = ColorProvider(palette.onAccent),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -192,25 +205,25 @@ private fun GlanceWidgetContent(
             Row(
                 modifier = GlanceModifier
                     .fillMaxWidth()
-                    .background(ColorProvider(Color(0xFF1D212E)))
+                    .background(ColorProvider(palette.raised))
                     .cornerRadius(10.dp)
                     .padding(horizontal = 8.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                MacroPillItem("P", "${protein}g", Color(0xFF38BDF8))
+                MacroPillItem("P", "${protein}g", palette.protein, palette.text)
                 Spacer(modifier = GlanceModifier.defaultWeight())
-                MacroPillItem("C", "${carbs}g", Color(0xFFFBBF24))
+                MacroPillItem("C", "${carbs}g", palette.carbs, palette.text)
                 Spacer(modifier = GlanceModifier.defaultWeight())
-                MacroPillItem("F", "${fat}g", Color(0xFFF43F5E))
+                MacroPillItem("F", "${fat}g", palette.fat, palette.text)
                 Spacer(modifier = GlanceModifier.defaultWeight())
-                MacroPillItem("H₂O", "${water}ml", Color(0xFF06B6D4))
+                MacroPillItem("Water", "${water}ml", palette.protein, palette.text)
             }
         }
     }
 }
 
 @Composable
-private fun MacroPillItem(label: String, value: String, accentColor: Color) {
+private fun MacroPillItem(label: String, value: String, accentColor: Color, textColor: Color) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = "$label: ",
@@ -223,7 +236,7 @@ private fun MacroPillItem(label: String, value: String, accentColor: Color) {
         Text(
             text = value,
             style = TextStyle(
-                color = ColorProvider(Color.White),
+                color = ColorProvider(textColor),
                 fontSize = 11.sp
             )
         )

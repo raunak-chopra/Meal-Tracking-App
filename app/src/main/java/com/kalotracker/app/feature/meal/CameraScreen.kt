@@ -50,6 +50,7 @@ fun CameraScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
     val state by viewModel.uiState.collectAsState()
+    androidx.activity.compose.BackHandler(enabled = state.isSaving) {}
 
     var imageCapture: ImageCapture? by remember { mutableStateOf(null) }
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
@@ -78,6 +79,14 @@ fun CameraScreen(
         }
     }
 
+    if (state.resumePending) AlertDialog(onDismissRequest = {},
+        title = { Text("Resume your meal?") }, text = { Text("Your unfinished photo meal is still here, including its original date and corrections.") },
+        confirmButton = { TextButton(onClick = viewModel::resumeDraft) { Text("Resume") } },
+        dismissButton = { TextButton(onClick = viewModel::resetScan) { Text("Discard") } })
+    if (state.draftLoading) {
+        Box(Modifier.fillMaxSize().background(KaloBackground), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        return
+    }
     Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
         // CameraX Viewfinder
         if (!hasCameraPermission) {
@@ -142,6 +151,7 @@ fun CameraScreen(
         ) {
             IconButton(
                 onClick = onClose,
+                enabled = !state.isSaving,
                 modifier = Modifier
                     .size(44.dp)
                     .clip(CircleShape)
@@ -297,7 +307,7 @@ fun CameraScreen(
 
         // Meal Review Sheet when items are detected
         AnimatedVisibility(
-            visible = state.items.isNotEmpty(),
+            visible = state.items.isNotEmpty() && !state.resumePending,
             enter = fadeIn(),
             exit = fadeOut()
         ) {
@@ -305,6 +315,9 @@ fun CameraScreen(
                 uiState = state,
                 actions = MealReviewActions(
                     onTitleChange = viewModel::setMealTitle,
+                    onScaleMeal = viewModel::scaleMeal,
+                    onCookingFatChange = viewModel::setCookingFat,
+                    onNutritionChange = viewModel::correctNutrition,
                     onNameChange = viewModel::setItemName,
                     onGramsChange = viewModel::setItemGrams,
                     onRemoveItem = viewModel::removeItem,

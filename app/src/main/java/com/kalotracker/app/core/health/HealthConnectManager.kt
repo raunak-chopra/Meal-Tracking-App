@@ -68,10 +68,6 @@ class HealthConnectManager(private val context: Context) {
         val client = healthConnectClient
             ?: return HealthDataSummary(isConnected = false, syncSource = "Health Connect unavailable")
 
-        if (!hasAllPermissions()) {
-            return HealthDataSummary(isConnected = false, syncSource = "Permission needed")
-        }
-
         val zoneId = ZoneId.systemDefault()
         val startOfDay = date.atStartOfDay(zoneId).toInstant()
         val endOfDay = if (date.isEqual(LocalDate.now())) {
@@ -81,6 +77,9 @@ class HealthConnectManager(private val context: Context) {
         }
 
         return try {
+            if (!hasAllPermissions()) {
+                return HealthDataSummary(isConnected = false, syncSource = "Permission needed")
+            }
             val response = client.aggregate(
                 AggregateRequest(
                     metrics = setOf(
@@ -100,6 +99,8 @@ class HealthConnectManager(private val context: Context) {
                 isConnected = true,
                 syncSource = "Health Connect"
             )
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             HealthDataSummary(
                 steps = 0L,

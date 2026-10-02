@@ -14,7 +14,8 @@ data class WorkoutEntity(
     val type: String, // "STRENGTH", "CARDIO"
     val durationMinutes: Int = 0,
     val estimatedCaloriesBurned: Int = 0,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    @androidx.room.ColumnInfo(defaultValue = "'[]'") val exercisesJson: String = "[]"
 )
 
 @Entity(

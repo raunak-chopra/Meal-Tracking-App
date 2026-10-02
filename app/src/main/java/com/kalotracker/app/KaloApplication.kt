@@ -30,7 +30,7 @@ class KaloApplication : Application() {
     val appSettings by lazy { AppSettings(this) }
     val analysisService by lazy { MealAnalysisService { appSettings.ai.value } }
     val weightRepository by lazy { WeightRepository(database.weightDao()) }
-    val backupManager by lazy { BackupManager(database, userProfileRepository, java.io.File(filesDir, "meals")) }
+    val backupManager by lazy { BackupManager(database, userProfileRepository, java.io.File(filesDir, "meals"), appSettings, java.io.File(noBackupFilesDir, "meal-draft.json")) }
     val waterRepository by lazy { com.kalotracker.app.core.data.repository.WaterRepository(database.waterDao()) }
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -43,11 +43,15 @@ class KaloApplication : Application() {
                 KaloWidgetUpdater.update(this@KaloApplication)
             }
         })
+        appScope.launch { userProfileRepository.history.collect { database.personalDao().putGoals(it) } }
         appScope.launch {
             userProfileRepository.profile.drop(1).collect { KaloWidgetUpdater.update(this@KaloApplication) }
         }
 
+        appScope.launch { appSettings.appearance.drop(1).collect { KaloWidgetUpdater.update(this@KaloApplication) } }
+
         // Keep an already-scheduled reminder on its exact time; only creates one if missing.
         ReminderScheduler.schedule(this, appSettings.reminder.value, replace = false)
+        com.kalotracker.app.core.data.backup.BackupScheduler.schedule(this, appSettings.backup.value.enabled)
     }
 }

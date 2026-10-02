@@ -28,6 +28,14 @@ interface WorkoutDao {
     @Query("SELECT * FROM workouts ORDER BY timestamp ASC")
     suspend fun getAllWorkouts(): List<WorkoutWithSets>
 
+    @Transaction @Query("SELECT * FROM workouts WHERE id = :id")
+    suspend fun getWorkoutById(id: String): WorkoutWithSets?
+
+    @Transaction
+    suspend fun replaceWorkoutWithSets(workout: WorkoutEntity, sets: List<ExerciseSetEntity>) {
+        deleteExerciseSetsByWorkoutId(workout.id); insertWorkout(workout); insertExerciseSets(sets)
+    }
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWorkout(workout: WorkoutEntity)
 
@@ -47,7 +55,7 @@ interface WorkoutDao {
     @Query(
         """
         SELECT s.* FROM exercise_sets s
-        WHERE s.exerciseName = :exerciseName COLLATE NOCASE
+        WHERE s.exerciseName = :exerciseName COLLATE NOCASE AND s.isCompleted = 1
           AND s.workoutId = (
             SELECT w.id FROM workouts w
             JOIN exercise_sets s2 ON s2.workoutId = w.id

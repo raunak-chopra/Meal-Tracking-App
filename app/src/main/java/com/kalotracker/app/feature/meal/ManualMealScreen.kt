@@ -16,6 +16,9 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,22 +37,41 @@ import java.util.UUID
 
 @Composable
 fun ManualMealScreen(
+    viewModel: ManualMealViewModel,
     onClose: () -> Unit,
-    onSaveMeal: (MealEntity, List<FoodItemEntity>) -> Unit,
+    onOpenLibrary: () -> Unit,
+    onSaveMeal: suspend (MealEntity, List<FoodItemEntity>) -> Unit,
     onScanBarcode: (() -> Unit)? = null,
     recentMeals: List<MealWithItems> = emptyList(),
-    onLogAgain: (MealWithItems, Long) -> Unit = { _, _ -> },
-    modifier: Modifier = Modifier
+    onLogAgain: suspend (MealWithItems, Long) -> Unit = { _, _ -> },
+    modifier: Modifier = Modifier,
+    initialTimestamp: Long = System.currentTimeMillis()
 ) {
-    var timestamp by remember { mutableStateOf(System.currentTimeMillis()) }
-    var searchQuery by remember { mutableStateOf("") }
-    var mealTitle by remember { mutableStateOf("") }
-    val addedItems = remember { mutableStateListOf<FoodItemEntity>() }
+    var timestamp by rememberSaveable { mutableStateOf(initialTimestamp) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var mealTitle by rememberSaveable { mutableStateOf("") }
+    val addedItems = rememberSaveable(saver = ManualItemsSaver) { mutableStateListOf<FoodItemEntity>() }
+    val saveStatus by viewModel.saveOperation.status.collectAsState()
+    val saved by viewModel.isSaved.collectAsState()
+    LaunchedEffect(saved) { if (saved) onClose() }
 
+    var showQuick by remember { mutableStateOf(false) }
     val filteredCatalog = remember(searchQuery) {
         FoodCatalog.search(searchQuery)
     }
 
+    if (showQuick) QuickFoodDialog(onDismiss = { showQuick = false }, onAdd = { title, kcal, p ->
+        addedItems.add(FoodItemEntity(mealId = "", name = title, portionGrams = 1f, calories = kcal, protein = p, carbs = 0f, fat = 0f))
+        showQuick = false
+    })
+    fun scaleDraft(multiplier: Float) {
+        if (saveStatus.busy) return
+        val scaled = addedItems.map { it.copy(portionGrams = it.portionGrams * multiplier,
+            calories = kotlin.math.round(it.calories * multiplier).toInt(), protein = it.protein * multiplier,
+            carbs = it.carbs * multiplier, fat = it.fat * multiplier) }
+        addedItems.clear()
+        addedItems.addAll(scaled)
+    }
     val totalCalories = addedItems.sumOf { it.calories }
     val totalProtein = addedItems.map { it.protein }.sum()
     val totalCarbs = addedItems.map { it.carbs }.sum()
@@ -70,7 +92,7 @@ fun ManualMealScreen(
                 IconButton(
                     onClick = onClose,
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
                         .background(KaloSurfaceElevated)
                 ) {
@@ -82,12 +104,12 @@ fun ManualMealScreen(
                 }
 
                 Text(
-                    text = "MANUAL FOOD LOG",
-                    style = KaloTypography.labelSmall,
+                    text = "Log meal",
+                    style = KaloTypography.titleLarge,
                     color = KaloTextSecondary
                 )
 
-                Box(modifier = Modifier.size(40.dp))
+                Box(modifier = Modifier.size(48.dp))
             }
         },
         bottomBar = {
@@ -100,6 +122,8 @@ fun ManualMealScreen(
                 ) {
                     KaloButton(
                         text = "Log Meal ($totalCalories kcal)",
+                        loading = saveStatus.busy,
+                        enabled = !saveStatus.busy,
                         onClick = {
                             val mealId = UUID.randomUUID().toString()
                             val meal = MealEntity(
@@ -112,8 +136,7 @@ fun ManualMealScreen(
                                 timestamp = timestamp
                             )
                             val itemsWithMealId = addedItems.map { it.copy(mealId = mealId) }
-                            onSaveMeal(meal, itemsWithMealId)
-                            onClose()
+                            viewModel.save { onSaveMeal(meal, itemsWithMealId) }
                         }
                     )
                 }
@@ -128,6 +151,18 @@ fun ManualMealScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(bottom = 100.dp)
         ) {
+            if (addedItems.isNotEmpty()) item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { scaleDraft(0.75f) }, enabled = !saveStatus.busy) { Text("Smaller meal") }
+                    OutlinedButton(onClick = { scaleDraft(1.25f) }, enabled = !saveStatus.busy) { Text("Larger meal") }
+                }
+                Text("Adjust the whole draft, including a repeated meal. Each tap changes it by about a quarter.", style = KaloTypography.bodySmall)
+            }
+
+            item { Row {
+                TextButton(onClick = onOpenLibrary) { Text("My foods & recipes") }
+                TextButton(onClick = { showQuick = true }) { Text("Quick kcal / protein") }
+            } }
             // Meal Title Input
             item {
                 OutlinedTextField(
@@ -206,7 +241,7 @@ fun ManualMealScreen(
                                 )
                                 IconButton(
                                     onClick = { addedItems.removeAt(index) },
-                                    modifier = Modifier.size(32.dp)
+                                    modifier = Modifier.size(48.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Delete,
@@ -268,10 +303,13 @@ fun ManualMealScreen(
                 }
             }
 
+            saveStatus.error?.let { message ->
+                item { Text(message, color = MaterialTheme.colorScheme.error) }
+            }
             if (searchQuery.isBlank() && recentMeals.isNotEmpty()) {
                 item {
                     Text(
-                        text = "RECENT MEALS (TAP TO LOG AGAIN)",
+                        text = "RECENT MEALS (TAP TO REVIEW)",
                         style = KaloTypography.labelSmall,
                         color = KaloTextSecondary
                     )
@@ -283,8 +321,10 @@ fun ManualMealScreen(
                             .clip(RoundedCornerShape(14.dp))
                             .background(KaloSurface)
                             .clickable {
-                                onLogAgain(recent, timestamp)
-                                onClose()
+                                if (!saveStatus.busy) {
+                                    if (mealTitle.isBlank()) mealTitle = recent.meal.title
+                                    addedItems.addAll(recent.items.map { it.copy(id = UUID.randomUUID().toString(), mealId = "") })
+                                }
                             }
                             .padding(14.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -293,7 +333,7 @@ fun ManualMealScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(recent.meal.title, style = KaloTypography.titleMedium, color = KaloTextPrimary)
                             Text(
-                                "${recent.meal.totalProteinGrams.toInt()}g P • ${recent.meal.totalCarbsGrams.toInt()}g C • ${recent.meal.totalFatGrams.toInt()}g F",
+                                "${recent.meal.totalProteinGrams.toInt()}g P â€¢ ${recent.meal.totalCarbsGrams.toInt()}g C â€¢ ${recent.meal.totalFatGrams.toInt()}g F",
                                 style = KaloTypography.bodyMedium,
                                 color = KaloTextSecondary
                             )
@@ -312,7 +352,7 @@ fun ManualMealScreen(
             }
 
             // Catalog Items
-            items(filteredCatalog) { catalogItem ->
+            items(filteredCatalog, key = { "catalog_" + it.id }) { catalogItem ->
                 FoodCatalogRow(
                     item = catalogItem,
                     onAdd = { grams ->
@@ -341,7 +381,8 @@ fun FoodCatalogRow(
     onAdd: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var gramsText by remember { mutableStateOf(item.defaultServingGrams.toInt().toString()) }
+    var gramsText by rememberSaveable(item.id) { mutableStateOf(item.defaultServingGrams.toInt().toString()) }
+    val grams = com.kalotracker.app.core.util.parseFoodPortion(gramsText)
 
     Row(
         modifier = modifier
@@ -374,7 +415,11 @@ fun FoodCatalogRow(
             OutlinedTextField(
                 value = gramsText,
                 onValueChange = { gramsText = it },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                label = { Text("g") },
+                isError = grams == null,
+                singleLine = true,
+                supportingText = if (grams == null) { { Text("0 < g â‰¤ 5000") } } else null,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.width(68.dp),
                 textStyle = KaloTypography.bodyMedium.copy(color = KaloTextPrimary),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -386,11 +431,11 @@ fun FoodCatalogRow(
 
             IconButton(
                 onClick = {
-                    val g = gramsText.toFloatOrNull() ?: item.defaultServingGrams
-                    onAdd(g)
+                    grams?.let(onAdd)
                 },
+                enabled = grams != null,
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(48.dp)
                     .clip(CircleShape)
                     .background(KaloSurfaceElevated)
             ) {
@@ -403,3 +448,18 @@ fun FoodCatalogRow(
         }
     }
 }
+
+/** Only small draft values go in saved state, never image bytes. */
+internal val ManualItemsSaver = listSaver<SnapshotStateList<FoodItemEntity>, Any>(
+    save = { items ->
+        items.flatMap { listOf(it.id, it.mealId, it.name, it.portionGrams, it.calories,
+            it.protein, it.carbs, it.fat, it.confidence) }
+    },
+    restore = { values ->
+        values.chunked(9).map { v ->
+            FoodItemEntity(v[0] as String, v[1] as String, v[2] as String,
+                v[3] as Float, v[4] as Int, v[5] as Float, v[6] as Float,
+                v[7] as Float, v[8] as Float)
+        }.toMutableStateList()
+    }
+)

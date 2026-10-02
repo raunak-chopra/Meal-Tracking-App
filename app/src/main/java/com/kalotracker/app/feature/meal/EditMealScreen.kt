@@ -40,10 +40,10 @@ fun EditMealScreen(
             ) {
                 IconButton(
                     onClick = onClose,
-                    modifier = Modifier.size(40.dp).clip(CircleShape).background(KaloSurfaceElevated)
+                    modifier = Modifier.size(48.dp).clip(CircleShape).background(KaloSurfaceElevated)
                 ) { Icon(Icons.Default.Close, contentDescription = "Close", tint = KaloTextPrimary) }
                 Text("EDIT MEAL", style = KaloTypography.labelSmall, color = KaloTextSecondary)
-                Box(Modifier.size(40.dp))
+                Box(Modifier.size(48.dp))
             }
         },
         bottomBar = {
@@ -64,13 +64,16 @@ fun EditMealScreen(
                 CircularProgressIndicator(color = KaloProtein)
             }
             state.notFound -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("This meal no longer exists.", style = KaloTypography.bodyLarge, color = KaloTextSecondary)
+                Text(state.errorMessage ?: "This meal no longer exists.", style = KaloTypography.bodyLarge, color = KaloTextSecondary)
             }
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 contentPadding = PaddingValues(bottom = 24.dp)
             ) {
+                state.errorMessage?.let { message ->
+                    item { Text(message, color = MaterialTheme.colorScheme.error) }
+                }
                 item {
                     OutlinedTextField(
                         value = state.title,
@@ -100,7 +103,8 @@ fun EditMealScreen(
                         item = item,
                         onNameChange = { viewModel.setItemName(item.id, it) },
                         onGramsChange = { viewModel.setItemGrams(item.id, it) },
-                        onRemove = { viewModel.removeItem(item.id) }
+                        onRemove = { viewModel.removeItem(item.id) },
+                        onNutritionChange = { k, p, c, f -> viewModel.correctNutrition(item.id, k, p, c, f) }
                     )
                 }
                 item {

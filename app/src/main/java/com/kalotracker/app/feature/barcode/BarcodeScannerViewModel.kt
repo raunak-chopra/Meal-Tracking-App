@@ -1,6 +1,7 @@
 package com.kalotracker.app.feature.barcode
 
 import androidx.lifecycle.ViewModel
+import com.kalotracker.app.core.util.SaveOperation
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.kalotracker.app.core.data.repository.MealRepository
@@ -16,6 +17,7 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 
 data class BarcodeUiState(
+    val timestamp: Long = System.currentTimeMillis(),
     val isLookingUp: Boolean = false,
     val scannedBarcode: String? = null,
     val product: ScannedFoodProduct? = null,
@@ -23,9 +25,14 @@ data class BarcodeUiState(
     val isTorchOn: Boolean = false,
     val errorMessage: String? = null,
     val isSaved: Boolean = false,
+    val isSaving: Boolean = false,
     val isManualInputVisible: Boolean = false,
-    val manualBarcodeText: String = ""
+    val manualBarcodeText: String = "",
+    val labelConfirmed: Boolean = false,
+    val reviewLabelUrl: String? = null
 ) {
+    val canLog: Boolean get() = product != null && !isSaving && !isSaved && !isLookingUp &&
+        (product.requiresLabelConfirmation.not() || labelConfirmed)
     val currentCalories: Int get() = product?.calculateCalories(portionGrams) ?: 0
     val currentProtein: Float get() = product?.calculateProtein(portionGrams) ?: 0f
     val currentCarbs: Float get() = product?.calculateCarbs(portionGrams) ?: 0f
@@ -34,11 +41,17 @@ data class BarcodeUiState(
 
 class BarcodeScannerViewModel(
     private val mealRepository: MealRepository,
-    private val foodFactsService: OpenFoodFactsService = OpenFoodFactsService()
+    private val foodFactsService: OpenFoodFactsService = OpenFoodFactsService(),
+    initialTimestamp: Long = System.currentTimeMillis()
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(BarcodeUiState())
+    private var lookupGeneration = 0L
+    private var lookupJob: kotlinx.coroutines.Job? = null
+    private val _uiState = MutableStateFlow(BarcodeUiState(timestamp = initialTimestamp))
     val uiState: StateFlow<BarcodeUiState> = _uiState.asStateFlow()
+    val saveOperation = SaveOperation { status ->
+        _uiState.update { it.copy(isSaving = status.busy, errorMessage = status.error) }
+    }
 
     fun onBarcodeScanned(barcode: String) {
         if (_uiState.value.isLookingUp || _uiState.value.product != null) return
@@ -47,13 +60,16 @@ class BarcodeScannerViewModel(
             it.copy(
                 isLookingUp = true,
                 scannedBarcode = barcode,
-                errorMessage = null
+                errorMessage = null, labelConfirmed = false, reviewLabelUrl = null
             )
         }
 
-        viewModelScope.launch {
+        val request = ++lookupGeneration
+        lookupJob?.cancel()
+        lookupJob = viewModelScope.launch {
             val result = foodFactsService.getProductByBarcode(barcode)
             result.onSuccess { product ->
+                if (request != lookupGeneration) return@onSuccess
                 _uiState.update {
                     it.copy(
                         isLookingUp = false,
@@ -62,17 +78,40 @@ class BarcodeScannerViewModel(
                     )
                 }
             }.onFailure { err ->
+                if (request != lookupGeneration) return@onFailure
                 _uiState.update {
                     it.copy(
                         isLookingUp = false,
-                        errorMessage = err.localizedMessage ?: "Lookup failed."
+                        errorMessage = err.localizedMessage ?: "Lookup failed.",
+                        reviewLabelUrl = (err as? com.kalotracker.app.core.network.BarcodeLookupException.LabelReviewRequired)?.labelUrl
                     )
                 }
             }
         }
     }
 
+    fun confirmLabel(value: Boolean) { _uiState.update { it.copy(labelConfirmed = value) } }
+
+    fun setTimestamp(value: Long) { _uiState.update { it.copy(timestamp = value) } }
+
+    fun refreshProduct() {
+        val product = _uiState.value.product ?: return
+        if (product.fromCatalog) return
+        val barcode = product.barcode
+        if (_uiState.value.isLookingUp || _uiState.value.isSaving) return
+        _uiState.update { it.copy(isLookingUp = true, errorMessage = null) }
+        val request = ++lookupGeneration
+        lookupJob?.cancel()
+        lookupJob = viewModelScope.launch {
+            val result = foodFactsService.getProductByBarcode(barcode, refresh = true)
+            if (request != lookupGeneration) return@launch
+            _uiState.update { it.copy(isLookingUp = false, product = result.getOrNull() ?: it.product,
+                labelConfirmed = false,
+                errorMessage = result.exceptionOrNull()?.localizedMessage) }
+        }
+    }
     fun updatePortionGrams(grams: Float) {
+        if (!grams.isFinite()) return
         _uiState.update { it.copy(portionGrams = grams.coerceIn(5f, 2500f)) }
     }
 
@@ -104,13 +143,16 @@ class BarcodeScannerViewModel(
     }
 
     fun resumeScanning() {
+        if (_uiState.value.isSaving) return
+        lookupGeneration++
+        lookupJob?.cancel()
         _uiState.update {
             it.copy(
                 isLookingUp = false,
                 scannedBarcode = null,
                 product = null,
                 errorMessage = null,
-                isSaved = false
+                isSaved = false, labelConfirmed = false, reviewLabelUrl = null
             )
         }
     }
@@ -118,13 +160,15 @@ class BarcodeScannerViewModel(
     fun logAsMeal(onSuccess: () -> Unit) {
         val s = _uiState.value
         val prod = s.product ?: return
+        if (!s.canLog) return
 
-        viewModelScope.launch {
+        saveOperation.launch(viewModelScope, onSuccess) {
             val mealId = UUID.randomUUID().toString()
             val mealTitle = prod.name.ifBlank { "Scanned Food" }
 
             val mealEntity = MealEntity(
                 id = mealId,
+                timestamp = s.timestamp,
                 title = mealTitle,
                 totalCalories = s.currentCalories,
                 totalProteinGrams = s.currentProtein,
@@ -141,23 +185,26 @@ class BarcodeScannerViewModel(
                 protein = s.currentProtein,
                 carbs = s.currentCarbs,
                 fat = s.currentFat,
-                confidence = 1.0f
+                confidence = if (prod.fromCatalog) 0.7f else 1.0f
             )
 
             mealRepository.saveMeal(mealEntity, listOf(foodEntity))
             _uiState.update { it.copy(isSaved = true) }
-            onSuccess()
+
         }
     }
 }
 
 class BarcodeScannerViewModelFactory(
-    private val mealRepository: MealRepository
+    private val mealRepository: MealRepository,
+    private val personalDao: com.kalotracker.app.core.database.dao.PersonalDao,
+    private val initialTimestamp: Long = System.currentTimeMillis(),
+    private val catalogLoader: (() -> com.kalotracker.app.core.network.IndianSnackCatalog)? = null
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(BarcodeScannerViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return BarcodeScannerViewModel(mealRepository) as T
+            return BarcodeScannerViewModel(mealRepository, OpenFoodFactsService(personalDao, catalogLoader), initialTimestamp) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

@@ -3,6 +3,7 @@ package com.kalotracker.app.feature.settings
 import android.content.ContentResolver
 import android.net.Uri
 import androidx.lifecycle.ViewModel
+import com.kalotracker.app.core.util.validateGoalInputs
 import com.kalotracker.app.core.data.backup.BackupCodec
 import com.kalotracker.app.core.data.backup.BackupManager
 import com.kalotracker.app.core.data.backup.ImportSummary
@@ -42,7 +43,10 @@ data class SettingsUiState(
     val reminder: ReminderSettings = ReminderSettings(),
     val dataBusy: Boolean = false,
     val dataMessage: String? = null,
-    val dataOk: Boolean = false
+    val dataOk: Boolean = false,
+    val goalError: String? = null,
+    val backupSchedule: com.kalotracker.app.core.settings.BackupSchedule = com.kalotracker.app.core.settings.BackupSchedule(),
+    val restorePreview: String? = null
 )
 
 class SettingsViewModel(
@@ -63,7 +67,10 @@ class SettingsViewModel(
     )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
+    private var pendingRestore: com.kalotracker.app.core.data.backup.ArchiveContents? = null
+    private var pendingJson: com.kalotracker.app.core.data.backup.BackupFile? = null
     init {
+        viewModelScope.launch { appSettings.backup.collect { s -> _uiState.update { it.copy(backupSchedule = s) } } }
         viewModelScope.launch {
             userProfileRepository.profile.collect { profile ->
                 _uiState.update {
@@ -107,20 +114,29 @@ class SettingsViewModel(
     }
 
     fun applyPreset(preset: MacroPreset) {
-        val calories = _uiState.value.calorieInput.toIntOrNull() ?: 2200
+        val calories = _uiState.value.calorieInput.toIntOrNull()
+        if (calories == null || calories !in 1..100_000) {
+            _uiState.update { it.copy(goalError = "Enter valid calories before applying a preset.") }
+            return
+        }
         userProfileRepository.applyPreset(preset, calories)
     }
 
-    fun saveGoals() {
+    fun saveGoals(): Boolean {
         val s = _uiState.value
+        val error = validateGoalInputs(s.calorieInput, s.proteinInput, s.carbsInput,
+            s.fatInput, s.stepsInput, s.waterInput)
+        _uiState.update { it.copy(goalError = error) }
+        if (error != null) return false
         userProfileRepository.updateTargets(
-            calories = s.calorieInput.toIntOrNull() ?: 2200,
-            protein = s.proteinInput.toIntOrNull() ?: 160,
-            carbs = s.carbsInput.toIntOrNull() ?: 220,
-            fat = s.fatInput.toIntOrNull() ?: 70,
-            steps = s.stepsInput.toLongOrNull() ?: 10000L,
-            waterMl = s.waterInput.toIntOrNull() ?: 2500
+            calories = s.calorieInput.toInt(),
+            protein = s.proteinInput.toInt(),
+            carbs = s.carbsInput.toInt(),
+            fat = s.fatInput.toInt(),
+            steps = s.stepsInput.toLong(),
+            waterMl = s.waterInput.toInt()
         )
+        return true
     }
 
     /** Saves the key/model, then makes a tiny request so a wrong key or model is caught right away. */
@@ -176,17 +192,49 @@ class SettingsViewModel(
         backup.meals.size
     }
 
-    fun importBackup(uri: Uri, resolver: ContentResolver) = runData(
-        successMessage = {
-            val r = it as ImportSummary
-            "Imported ${r.meals} meals, ${r.workouts} workouts, ${r.water} water and ${r.weights} weight entries."
+    fun chooseBackupFolder(uri: Uri, resolver: ContentResolver, context: android.content.Context) {
+        try {
+            resolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            appSettings.saveBackup(uri.toString(), true)
+            com.kalotracker.app.core.data.backup.BackupScheduler.schedule(context, true)
+        } catch (e: Exception) { _uiState.update { it.copy(dataMessage = "Could not keep folder access. Choose another folder.", dataOk = false) } }
+    }
+    fun enableBackup(enabled: Boolean, context: android.content.Context) {
+        if (enabled && appSettings.backup.value.folder.isBlank()) return
+        appSettings.saveBackup(appSettings.backup.value.folder, enabled)
+        com.kalotracker.app.core.data.backup.BackupScheduler.schedule(context, enabled)
+    }
+    fun exportArchive(uri: Uri, resolver: ContentResolver) = runData({ "Archive saved, including photos and library. API key excluded." }) {
+        val output = withContext(Dispatchers.IO) { resolver.openOutputStream(uri, "wt") } ?: throw java.io.IOException("Couldn't write archive.")
+        backupManager.exportArchive(output)
+    }
+    fun previewImport(uri: Uri, resolver: ContentResolver) = runData({ "Review the restore preview before importing." }) {
+        cancelRestore()
+        withContext(Dispatchers.IO) {
+            val stream = java.io.BufferedInputStream(resolver.openInputStream(uri) ?: throw java.io.IOException("Couldn't open backup."))
+            stream.use {
+                it.mark(4); val first = it.read(); val second = it.read(); it.reset()
+                if (first == 80 && second == 75) {
+                    pendingRestore = com.kalotracker.app.core.data.backup.ArchiveCodec.read(it); pendingJson = null
+                } else {
+                    val out = java.io.ByteArrayOutputStream(); val buffer = ByteArray(8192)
+                    while (out.size() <= 30 * 1024 * 1024) { val n = it.read(buffer); if (n < 0) break; out.write(buffer, 0, n) }
+                    val text = out.toByteArray()
+                    if (text.size > 30 * 1024 * 1024) throw java.io.IOException("Backup is too large.")
+                    pendingJson = BackupCodec.decode(text.toString(Charsets.UTF_8)); pendingRestore = null
+                }
+            }
+            val f = pendingRestore?.backup ?: pendingJson!!
+            _uiState.update { it.copy(restorePreview = "${f.meals.size} meals, ${f.workouts.size} workouts, ${f.water.size} water, ${f.weights.size} weights; ${f.savedFoods.size} foods/recipes, ${f.routines.size} routines, ${f.dayStatus.size} day statuses, ${f.goalHistory.size} goal dates, ${pendingRestore?.photos?.size ?: 0} photos.\nMerge by id; matching records are updated, other local records are kept. Goals and non-secret settings may be replaced. Your API key and backup folder stay.") }
         }
-    ) {
-        val text = withContext(Dispatchers.IO) {
-            resolver.openInputStream(uri)?.bufferedReader()?.use { reader -> reader.readText() }
-                ?: throw java.io.IOException("Couldn't open that file.")
-        }
-        backupManager.import(BackupCodec.decode(text))
+    }
+    fun cancelRestore() { pendingJson = null; pendingRestore = null; _uiState.update { it.copy(restorePreview = null) } }
+    fun confirmRestore() = runData({ "Restore completed." }) {
+        val archive = pendingRestore
+        val json = pendingJson
+        if (archive != null) backupManager.restoreArchive(archive) else if (json != null) backupManager.import(json) else throw java.io.IOException("Choose a backup first.")
+        scheduleReminder(appSettings.reminder.value)
+        cancelRestore()
     }
 
     fun deleteAllData() = runData(successMessage = { "All logs and photos were deleted." }) {

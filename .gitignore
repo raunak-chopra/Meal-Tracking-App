@@ -62,3 +62,7 @@ exports/
 docs/*.diff
 /release-notes.md
 /.release-setup/
+
+# Local planning/reconstruction notes
+/docs/APP_UPGRADE_PLAN.md
+/docs/PROJECT_STATUS_AND_ROADMAP.md

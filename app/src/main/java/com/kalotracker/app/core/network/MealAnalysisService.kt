@@ -20,9 +20,9 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /** Talks to the Gemini API directly using the user's own key. No server involved. */
-class MealAnalysisService(private val settingsProvider: () -> AiSettings) {
+open class MealAnalysisService(private val settingsProvider: () -> AiSettings) {
 
-    suspend fun analyzeMealImage(
+    open suspend fun analyzeMealImage(
         imageBytes: ByteArray,
         userNote: String? = null
     ): Result<MealAnalysisResponse> = withContext(Dispatchers.IO) {
@@ -33,6 +33,8 @@ class MealAnalysisService(private val settingsProvider: () -> AiSettings) {
             val body = buildRequest(Base64.encodeToString(imageBytes, Base64.NO_WRAP), userNote)
             val text = post(settings, body.toString())
             Result.success(parseGeminiResponse(JSON, text))
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (e: MealAnalysisException) {
             Result.failure(e)
         } catch (e: IOException) {
@@ -57,6 +59,8 @@ class MealAnalysisService(private val settingsProvider: () -> AiSettings) {
             }
             post(settings, body.toString())
             Result.success(Unit)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (e: MealAnalysisException) {
             Result.failure(e)
         } catch (e: IOException) {
@@ -85,6 +89,8 @@ class MealAnalysisService(private val settingsProvider: () -> AiSettings) {
                 ?.firstNotNullOfOrNull { it.jsonObject["text"]?.jsonPrimitive?.contentOrNull }
                 ?: throw MealAnalysisException.BadResponse("empty response")
             Result.success(text.trim())
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (e: MealAnalysisException) {
             Result.failure(e)
         } catch (e: IOException) {
@@ -164,9 +170,9 @@ Rules:
 1. Set is_food=false (and items=[]) if the photo does not show food or drink.
 2. Estimate each item's edible weight in grams from visual cues (plate size, cutlery, typical servings). Prefer realistic servings; do not inflate.
 3. Give calories and macros for THAT weight using standard USDA-style values.
-4. Do NOT add cooking oil or butter unless it is clearly visible as its own item; the app adds oil separately when the user asks.
+4. Include a plausible modest allowance for cooking fats and sauces within the dish nutrition when preparation suggests them. Do not count them again as separate items unless visibly separate or the user explicitly describes an extra amount. State important assumptions.
 5. confidence is 0.0-1.0 for the whole meal; lower it for blurry photos, mixed dishes or hidden ingredients.
-6. estimation_notes: one short sentence naming the main assumption, for example the plate size you assumed."""
+6. estimation_notes: one short sentence naming the main assumption, including raw/cooked preparation or cooking fat when relevant. Aim for a useful everyday estimate; never require the user to weigh food. Follow the user note for quantities and food corrections."""
 
         private fun type(name: String) = buildJsonObject { put("type", name) }
 
@@ -228,12 +234,12 @@ internal fun parseGeminiResponse(json: Json, raw: String): MealAnalysisResponse 
 
     val valid = parsed.items.filter {
         it.name.isNotBlank() &&
-            it.portionGrams.isFinite() && it.portionGrams > 0f &&
-            it.calories >= 0 &&
-            it.protein.isFinite() && it.protein >= 0f &&
-            it.carbs.isFinite() && it.carbs >= 0f &&
-            it.fat.isFinite() && it.fat >= 0f
-    }.map { it.copy(confidence = it.confidence.coerceIn(0f, 1f)) }
+            it.portionGrams.isFinite() && it.portionGrams in 1f..5000f &&
+            it.calories in 0..100000 &&
+            it.protein.isFinite() && it.protein in 0f..5000f &&
+            it.carbs.isFinite() && it.carbs in 0f..5000f &&
+            it.fat.isFinite() && it.fat in 0f..5000f
+    }.take(100).map { it.copy(confidence = if (it.confidence.isFinite()) it.confidence.coerceIn(0f, 1f) else 0f) }
 
     if (valid.isEmpty()) throw MealAnalysisException.NotFood()
 

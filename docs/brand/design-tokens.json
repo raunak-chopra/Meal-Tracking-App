@@ -1,0 +1,15 @@
+{
+  "version": "1.0",
+  "date": "2026-09-30",
+  "status": "recommended-for-review",
+  "direction": "Warm Precision / Open Plate",
+  "units": {"layout": "dp", "type": "sp", "motion": "ms"},
+  "dark": {"background":"#151916","surface":"#202621","surfaceRaised":"#2B332D","onSurface":"#F4F1E8","secondaryText":"#BBC3B7","primary":"#F1A17C","onPrimary":"#202720","outline":"#899583","divider":"#414B42","protein":"#A1C3D9","carbs":"#C7D39B","fat":"#E6ADBA","water":"#A1C3D9","error":"#FFB4AB","onError":"#690005"},
+  "light": {"background":"#F5F2E9","surface":"#FFFFFF","surfaceRaised":"#E8ECE2","onSurface":"#202720","secondaryText":"#586252","primary":"#98462D","onPrimary":"#FFFFFF","outline":"#6E7868","divider":"#D5DACE","protein":"#375E77","carbs":"#566532","fat":"#874F61","water":"#375E77","error":"#A52A24","onError":"#FFFFFF"},
+  "type": {"fontFamily":"Android platform default","previewFont":"Segoe UI","optionalBrandFamily":"DM Sans; exact build and license to be bundled if selected","weights":[400,500,600,700],"features":{"metrics":"tnum"},"display":{"size":40,"lineHeight":44,"weight":600},"headline":{"size":28,"lineHeight":34,"weight":600},"title":{"size":22,"lineHeight":28,"weight":600},"subhead":{"size":18,"lineHeight":24,"weight":600},"body":{"size":16,"lineHeight":24,"weight":400},"utility":{"size":14,"lineHeight":20,"weight":500},"label":{"size":12,"lineHeight":16,"weight":500}},
+  "spacing": [4,8,12,16,20,24,32,48],
+  "radius": {"input":12,"button":16,"card":20,"sheet":24,"hero":28},
+  "controls": {"minTouchTarget":48,"primaryButtonMinHeight":56,"iconVisual":24,"mealThumb":64,"compactMargin":20,"constrainedMargin":16},
+  "motion": {"feedback":160,"transition":240,"progress":300,"reducedMotion":"immediate state change"},
+  "responsive": {"compactMaxContent":600,"largeFontMacroLayout":"vertical","largeFontEditorLayout":"stacked","insets":"Scaffold + WindowInsets + IME"}
+}

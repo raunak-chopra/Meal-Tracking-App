@@ -1,6 +1,7 @@
 package com.kalotracker.app.feature.meal
 
 import androidx.lifecycle.ViewModel
+import com.kalotracker.app.core.util.SaveOperation
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.kalotracker.app.core.data.food.FoodCatalogItem
@@ -20,7 +21,8 @@ data class EditMealUiState(
     val timestamp: Long = System.currentTimeMillis(),
     val items: List<EditableFoodItem> = emptyList(),
     val notes: String = "",
-    val isSaving: Boolean = false
+    val isSaving: Boolean = false,
+    val errorMessage: String? = null
 ) {
     val totalCalories: Int get() = items.sumOf { it.currentCalories }
     val totalProtein: Float get() = items.map { it.currentProtein }.sum()
@@ -35,12 +37,17 @@ class EditMealViewModel(
 
     private val _uiState = MutableStateFlow(EditMealUiState())
     val uiState: StateFlow<EditMealUiState> = _uiState.asStateFlow()
+    val saveOperation = SaveOperation { status ->
+        _uiState.update { it.copy(isSaving = status.busy, errorMessage = status.error) }
+    }
 
     private var original: MealEntity? = null
 
     init {
         viewModelScope.launch {
-            val loaded = mealRepository.getMeal(mealId)
+            val loaded = try { mealRepository.getMeal(mealId) }
+                catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+                catch (e: Exception) { _uiState.update { it.copy(isLoading = false, notFound = true, errorMessage = "Could not load meal. Close and try again.") }; return@launch }
             if (loaded == null) {
                 _uiState.update { it.copy(isLoading = false, notFound = true) }
                 return@launch
@@ -75,7 +82,10 @@ class EditMealViewModel(
     fun setNotes(value: String) = _uiState.update { it.copy(notes = value) }
 
     fun setItemName(id: String, name: String) = updateItem(id) { it.copy(name = name) }
-    fun setItemGrams(id: String, grams: Float) = updateItem(id) { it.copy(portionGrams = grams.coerceIn(1f, 5000f)) }
+    fun setItemGrams(id: String, grams: Float) { if (grams.isFinite()) updateItem(id) { it.copy(portionGrams = grams.coerceIn(1f, 5000f)) } }
+    fun correctNutrition(id: String, kcal: Int, p: Float, c: Float, f: Float) {
+        updateItem(id) { it.correctedNutrition(kcal, p, c, f) }
+    }
     fun removeItem(id: String) = _uiState.update { s -> s.copy(items = s.items.filterNot { it.id == id }) }
 
     fun addCatalogItem(food: FoodCatalogItem) {
@@ -99,8 +109,7 @@ class EditMealViewModel(
         val s = _uiState.value
         val base = original ?: return
         if (s.items.isEmpty() || s.isSaving) return
-        viewModelScope.launch {
-            _uiState.update { it.copy(isSaving = true) }
+        saveOperation.launch(viewModelScope, onDone) {
             val meal = base.copy(
                 title = s.title.ifBlank { "Logged Meal" },
                 totalCalories = s.totalCalories,
@@ -124,8 +133,7 @@ class EditMealViewModel(
                 )
             }
             mealRepository.updateMeal(meal, items)
-            _uiState.update { it.copy(isSaving = false) }
-            onDone()
+
         }
     }
 }
