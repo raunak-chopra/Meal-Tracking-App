@@ -19,7 +19,9 @@ data class DayTotals(
     val workoutCount: Int = 0,
     val mealCount: Int = 0,
     /** Calories from meals eaten at 21:00 or later. */
-    val lateCalories: Int = 0
+    val lateCalories: Int = 0,
+    val complete: Boolean = true,
+    val historicalTargets: NutritionTargets? = null
 ) {
     val isLogged: Boolean get() = mealCount > 0
 }
@@ -76,21 +78,22 @@ object TrendAnalyzer {
             }.toList()
     }
 
-    fun stats(days: List<DayTotals>, targets: NutritionTargets, today: LocalDate): TrendStats {
-        val logged = days.filter { it.isLogged }
+    fun stats(days: List<DayTotals>, targets: NutritionTargets, today: LocalDate, requireComplete: Boolean = false): TrendStats {
+        val logged = days.filter { it.isLogged && (!requireComplete || (it.complete && it.date < today)) }
         val n = logged.size
         return TrendStats(
             days = days,
             loggedDays = n,
             avgCalories = if (n == 0) 0 else logged.sumOf { it.calories } / n,
             avgProtein = if (n == 0) 0 else (logged.map { it.protein }.sum() / n).roundToInt(),
-            avgWaterMl = if (days.isEmpty()) 0 else days.sumOf { it.waterMl } / days.size,
-            proteinHitDays = logged.count { it.protein >= targets.protein * 0.9f },
+            avgWaterMl = if (requireComplete) { if (n == 0) 0 else logged.sumOf { it.waterMl } / n } else if (days.isEmpty()) 0 else days.sumOf { it.waterMl } / days.size,
+            proteinHitDays = logged.count { val t = if (requireComplete) it.historicalTargets else targets; t != null && t.protein > 0 && it.protein >= t.protein * 0.9f },
             calorieOnTargetDays = logged.count {
-                targets.calories > 0 && abs(it.calories - targets.calories) <= targets.calories * 0.10f
+                val t = if (requireComplete) it.historicalTargets else targets
+                t != null && t.calories > 0 && abs(it.calories - t.calories) <= t.calories * 0.10f
             },
             workoutDays = days.count { it.workoutCount > 0 },
-            streak = streak(days, today)
+            streak = streak(if (requireComplete) days.filter { it.complete && it.date < today } else days, today)
         )
     }
 
@@ -169,6 +172,18 @@ data class WeightPoint(val epochMillis: Long, val kg: Float)
 data class GoalSuggestion(val message: String, val newCalorieTarget: Int? = null)
 
 object GoalAdvisor {
+
+    fun withEvidence(goal: GoalType, points: List<WeightPoint>, days: List<DayTotals>, currentTarget: Int): GoalSuggestion {
+        val complete = days.filter { it.complete && it.isLogged }
+        if (complete.size < 10) return GoalSuggestion("Mark at least 10 fully logged past days complete before adjusting your target.")
+        if (complete.any { it.historicalTargets == null } || complete.map { it.historicalTargets }.distinct().size > 1)
+            return GoalSuggestion("Keep a consistent goal and collect complete days before adjusting calories.")
+        val onTarget = complete.count { abs(it.calories - currentTarget) <= currentTarget * 0.15f }
+        if (onTarget < complete.size * 0.7f) return GoalSuggestion("Your logged intake varies from your target. Review consistency before changing the target.")
+        val start = complete.minOf { it.date }.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val end = complete.maxOf { it.date }.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        return suggest(goal, weeklyChangeKg(points.filter { it.epochMillis in start until end }), currentTarget)
+    }
 
     private const val MIN_SPAN_DAYS = 10
     private const val MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000.0

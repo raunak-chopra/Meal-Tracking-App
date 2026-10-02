@@ -11,6 +11,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -51,6 +53,7 @@ fun BarcodeScannerScreen(
     onEnterManually: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val state by viewModel.uiState.collectAsState()
@@ -233,7 +236,7 @@ fun BarcodeScannerScreen(
 
         // Lookup failure card: never invents a product, offers honest next steps
         AnimatedVisibility(
-            visible = state.errorMessage != null,
+            visible = state.errorMessage != null && state.product == null,
             enter = slideInVertically(initialOffsetY = { it }),
             exit = slideOutVertically(targetOffsetY = { it }),
             modifier = Modifier.align(Alignment.BottomCenter)
@@ -249,7 +252,7 @@ fun BarcodeScannerScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "Couldn't find this product",
+                    text = if (state.reviewLabelUrl != null) "Check this product label" else "Couldn't find this product",
                     style = KaloTypography.titleMedium,
                     color = KaloTextPrimary
                 )
@@ -258,6 +261,9 @@ fun BarcodeScannerScreen(
                     style = KaloTypography.bodyMedium,
                     color = KaloTextSecondary
                 )
+                state.reviewLabelUrl?.let { url ->
+                    TextButton(onClick = { uriHandler.openUri(url) }) { Text("Open nutrition label") }
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedButton(
                         onClick = { viewModel.resumeScanning() },
@@ -283,6 +289,12 @@ fun BarcodeScannerScreen(
             state.product?.let { product ->
                 ScannedProductCard(
                     product = product,
+                    canLog = state.canLog, labelConfirmed = state.labelConfirmed, onConfirmLabel = viewModel::confirmLabel,
+                    onOpenLabel = { product.labelUrl?.let { uriHandler.openUri(it) } },
+                    timestamp = state.timestamp, onTimeChange = viewModel::setTimestamp,
+                    isSaving = state.isSaving,
+                    saveError = state.errorMessage,
+                    onRefresh = viewModel::refreshProduct,
                     portionGrams = state.portionGrams,
                     calories = state.currentCalories,
                     protein = state.currentProtein,
@@ -291,6 +303,7 @@ fun BarcodeScannerScreen(
                     onAdjustPortion = { mult -> viewModel.adjustPortion(mult) },
                     onRescan = { viewModel.resumeScanning() },
                     onConfirm = {
+                        if (!state.canLog) return@ScannedProductCard
                         if (onProductSelected != null) {
                             onProductSelected(
                                 product.name,
@@ -363,6 +376,11 @@ fun BarcodeScannerScreen(
 @Composable
 private fun ScannedProductCard(
     product: ScannedFoodProduct,
+    canLog: Boolean, labelConfirmed: Boolean, onConfirmLabel: (Boolean) -> Unit, onOpenLabel: () -> Unit,
+    timestamp: Long, onTimeChange: (Long) -> Unit,
+    isSaving: Boolean,
+    saveError: String?,
+    onRefresh: () -> Unit,
     portionGrams: Float,
     calories: Int,
     protein: Float,
@@ -373,14 +391,19 @@ private fun ScannedProductCard(
     onConfirm: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+    val maxHeight = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp * 0.85f
     Box(
         modifier = modifier
             .fillMaxWidth()
+            .heightIn(max = maxHeight)
+            .navigationBarsPadding()
             .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
             .background(KaloSurface)
             .padding(24.dp)
     ) {
-        Column {
+        Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+            com.kalotracker.app.core.designsystem.components.DateTimeChip(timestamp, onTimeChange)
             // Header: Title, Brand, Barcode
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -411,7 +434,7 @@ private fun ScannedProductCard(
                 IconButton(
                     onClick = onRescan,
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
                         .background(KaloSurfaceElevated)
                 ) {
@@ -484,10 +507,27 @@ private fun ScannedProductCard(
 
             Spacer(modifier = Modifier.height(20.dp))
 
+            if (product.fromCatalog) {
+                Text("Indian snack starter catalog · Open Food Facts contributors", style = KaloTypography.labelSmall)
+                Text("Check the product and pack size against your packet. Label photos need internet.")
+                TextButton(onClick = { uriHandler.openUri("https://openfoodfacts.github.io/documentation/docs/Product-Opener/api/") }) { Text("Data source and licenses") }
+            }
+            if (product.labelUrl != null) TextButton(onClick = onOpenLabel) { Text("Open nutrition label") }
+            if (product.requiresLabelConfirmation) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = labelConfirmed, onCheckedChange = onConfirmLabel)
+                    Text("This product and nutrition match my packet", modifier = Modifier.weight(1f))
+                }
+            }
+            saveError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            if (product.fromCache) Text("Saved barcode data (works offline).")
+            if (!product.fromCatalog) TextButton(onClick = onRefresh, enabled = !isSaving) { Text("Refresh label data") }
             // Log Meal / Confirm Button
             KaloButton(
                 text = "Log Food ($calories kcal)",
-                onClick = onConfirm
+                onClick = onConfirm,
+                loading = isSaving,
+                enabled = canLog
             )
         }
     }

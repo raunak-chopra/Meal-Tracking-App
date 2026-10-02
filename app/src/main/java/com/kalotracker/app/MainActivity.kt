@@ -1,12 +1,10 @@
 package com.kalotracker.app
 
-import android.Manifest
-import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.lifecycleScope
 import com.kalotracker.app.core.designsystem.KaloTheme
@@ -24,17 +22,9 @@ class MainActivity : ComponentActivity() {
         // Permissions updated - will be reflected in Compose flows on next read
     }
 
-    // Camera Permission Launcher
-    private val cameraPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        // Handled in CameraScreen
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        checkPermissions()
 
         val startDestination = when (intent?.getStringExtra("EXTRA_START_DESTINATION")) {
             "camera" -> com.kalotracker.app.navigation.KaloDestinations.CAMERA
@@ -42,8 +32,10 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            KaloTheme {
+            val appearance by app.appSettings.appearance.collectAsState()
+            KaloTheme(appearance) {
                 KaloNavHost(
+                    personalDao = app.database.personalDao(),
                     mealRepository = app.mealRepository,
                     workoutRepository = app.workoutRepository,
                     userProfileRepository = app.userProfileRepository,
@@ -57,12 +49,6 @@ class MainActivity : ComponentActivity() {
                     startDestination = startDestination
                 )
             }
-        }
-    }
-
-    private fun checkPermissions() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 

@@ -1,9 +1,2 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <color name="kalo_background">#090A0F</color>
-    <color name="kalo_surface">#14161F</color>
-    <color name="kalo_accent_protein">#38BDF8</color>
-    <color name="kalo_accent_carbs">#FBBF24</color>
-    <color name="kalo_accent_fat">#F43F5E</color>
-    <color name="kalo_accent_steps">#10B981</color>
-</resources>
+<resources><color name="kalo_background">#F5F2E9</color><color name="kalo_surface">#FFFFFF</color><color name="kalo_icon_background">#151916</color><color name="kalo_accent_protein">#375E77</color><color name="kalo_accent_carbs">#566532</color><color name="kalo_accent_fat">#874F61</color><color name="kalo_accent_steps">#566532</color></resources>

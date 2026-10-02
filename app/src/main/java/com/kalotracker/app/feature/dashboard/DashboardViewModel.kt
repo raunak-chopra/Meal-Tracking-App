@@ -1,6 +1,7 @@
 package com.kalotracker.app.feature.dashboard
 
 import androidx.lifecycle.ViewModel
+import com.kalotracker.app.core.util.SaveOperation
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.kalotracker.app.core.ai.NutritionInsight
@@ -30,6 +31,7 @@ sealed class UndoAction(val message: String) {
 data class DashboardUiState(
     val selectedDate: LocalDate = LocalDate.now(),
     val isToday: Boolean = true,
+    val dayComplete: Boolean = false,
     val targetCalories: Int = 2200,
     val currentCalories: Int = 0,
     val targetProtein: Int = 160,
@@ -46,10 +48,13 @@ data class DashboardUiState(
     val todayWorkouts: List<WorkoutWithSets> = emptyList(),
     val dailyInsight: NutritionInsight? = null,
     val pendingUndo: UndoAction? = null,
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    val isRepeatingMeal: Boolean = false,
+    val repeatMessage: String? = null
 )
 
 class DashboardViewModel(
+    private val personalDao: com.kalotracker.app.core.database.dao.PersonalDao,
     private val mealRepository: MealRepository,
     private val workoutRepository: WorkoutRepository,
     private val userProfileRepository: UserProfileRepository,
@@ -59,31 +64,34 @@ class DashboardViewModel(
 
     private val _uiState = MutableStateFlow(DashboardUiState())
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
+    private val repeatSave = SaveOperation { status ->
+        _uiState.update { it.copy(isRepeatingMeal = status.busy, repeatMessage = status.error) }
+    }
 
+    private var dayStatuses = emptyList<com.kalotracker.app.core.database.entity.DayStatusEntity>()
+    private var healthJob: Job? = null
+    private var healthRequest = 0L
     private var mealsJob: Job? = null
     private var workoutsJob: Job? = null
     private var waterJob: Job? = null
 
     init {
+        viewModelScope.launch {
+            personalDao.observeDays().collect { days ->
+                dayStatuses = days
+                _uiState.update { it.copy(dayComplete = days.any { d -> d.date == it.selectedDate.toString() && d.complete }) }
+            }
+        }
         // Observe profile changes (targets)
         viewModelScope.launch {
             userProfileRepository.profile.collect { profile ->
-                _uiState.update {
-                    it.copy(
-                        targetCalories = profile.targetCalories,
-                        targetProtein = profile.targetProtein,
-                        targetCarbs = profile.targetCarbs,
-                        targetFat = profile.targetFat,
-                        targetSteps = profile.targetSteps,
-                        targetWaterMl = profile.targetWaterMl
-                    )
-                }
+                applyTargets()
                 recomputeInsight()
             }
         }
 
+        viewModelScope.launch { userProfileRepository.history.collect { applyTargets(); recomputeInsight() } }
         loadDataForDate(LocalDate.now())
-        refreshHealthData()
     }
 
     fun goToPreviousDay() {
@@ -105,10 +113,13 @@ class DashboardViewModel(
         _uiState.update {
             it.copy(
                 selectedDate = date,
-                isToday = isToday
+                dayComplete = dayStatuses.any { it.date == date.toString() && it.complete },
+                isToday = isToday,
+                healthData = HealthDataSummary()
             )
         }
 
+        applyTargets()
         val zoneId = ZoneId.systemDefault()
         val startOfDay = date.atStartOfDay(zoneId).toInstant().toEpochMilli()
         val endOfDay = date.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli() - 1
@@ -153,9 +164,27 @@ class DashboardViewModel(
         refreshHealthData(date)
     }
 
+    fun setDayComplete(complete: Boolean) {
+        val date = _uiState.value.selectedDate.toString()
+        repeatSave.launch(viewModelScope, {}) {
+            personalDao.putDays(listOf(com.kalotracker.app.core.database.entity.DayStatusEntity(date, complete)))
+        }
+    }
+
+    fun onResume() {
+        if (_uiState.value.isToday && _uiState.value.selectedDate != LocalDate.now()) {
+            loadDataForDate(LocalDate.now())
+        } else {
+            refreshHealthData()
+        }
+    }
+
     fun refreshHealthData(date: LocalDate = _uiState.value.selectedDate) {
-        viewModelScope.launch {
+        val request = ++healthRequest
+        healthJob?.cancel()
+        healthJob = viewModelScope.launch {
             val healthSummary = healthConnectManager.readHealthDataForDate(date)
+            if (request != healthRequest || date != _uiState.value.selectedDate) return@launch
             _uiState.update { it.copy(healthData = healthSummary) }
             recomputeInsight()
         }
@@ -212,9 +241,11 @@ class DashboardViewModel(
     }
 
     /** Logs a copy of a meal on the day being viewed (now if today, otherwise noon of that day). */
+    fun dismissRepeatMessage() { _uiState.update { it.copy(repeatMessage = null) } }
+
     fun logMealAgain(source: MealWithItems) {
-        viewModelScope.launch {
-            val s = _uiState.value
+        val s = _uiState.value
+        repeatSave.launch(viewModelScope, { _uiState.update { it.copy(repeatMessage = "Meal logged.") } }) {
             val timestamp = if (s.isToday) {
                 System.currentTimeMillis()
             } else {
@@ -224,8 +255,18 @@ class DashboardViewModel(
         }
     }
 
+    private fun applyTargets() {
+        val state = _uiState.value
+        val current = userProfileRepository.profile.value
+        val goal = userProfileRepository.history.value.filter { it.date <= state.selectedDate.toString() }.maxByOrNull { it.date }
+        _uiState.update { it.copy(targetCalories = goal?.calories ?: 0, targetProtein = goal?.protein ?: 0,
+            targetCarbs = goal?.carbs ?: 0, targetFat = goal?.fat ?: 0, targetWaterMl = goal?.waterMl ?: 0,
+            targetSteps = current.targetSteps) }
+    }
+
     private fun recomputeInsight() {
         val s = _uiState.value
+        if (s.targetCalories <= 0) { _uiState.update { it.copy(dailyInsight = null) }; return }
         val insight = NutritionInsightEngine.generateDailyInsight(
             targetCalories = s.targetCalories,
             consumedCalories = s.currentCalories,
@@ -245,6 +286,7 @@ class DashboardViewModel(
 }
 
 class DashboardViewModelFactory(
+    private val personalDao: com.kalotracker.app.core.database.dao.PersonalDao,
     private val mealRepository: MealRepository,
     private val workoutRepository: WorkoutRepository,
     private val userProfileRepository: UserProfileRepository,
@@ -255,6 +297,7 @@ class DashboardViewModelFactory(
         if (modelClass.isAssignableFrom(DashboardViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
             return DashboardViewModel(
+                personalDao,
                 mealRepository,
                 workoutRepository,
                 userProfileRepository,

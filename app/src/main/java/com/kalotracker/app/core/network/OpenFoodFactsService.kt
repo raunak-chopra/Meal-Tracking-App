@@ -7,6 +7,7 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
+@kotlinx.serialization.Serializable
 data class ScannedFoodProduct(
     val barcode: String,
     val name: String,
@@ -16,7 +17,11 @@ data class ScannedFoodProduct(
     val proteinPer100g: Float = 0f,
     val carbsPer100g: Float = 0f,
     val fatPer100g: Float = 0f,
-    val imageUrl: String? = null
+    val imageUrl: String? = null,
+    val fromCache: Boolean = false,
+    val labelUrl: String? = null,
+    val requiresLabelConfirmation: Boolean = false,
+    val fromCatalog: Boolean = false
 ) {
     fun calculateCalories(grams: Float): Int = ((caloriesPer100g * grams) / 100f).toInt()
     fun calculateProtein(grams: Float): Float = (proteinPer100g * grams) / 100f
@@ -31,19 +36,32 @@ sealed class BarcodeLookupException(message: String) : Exception(message) {
     class NoNutritionData(val barcode: String) :
         BarcodeLookupException("This product is listed but has no calorie data.")
 
+    class LabelReviewRequired(val productName: String, val labelUrl: String) :
+        BarcodeLookupException("Found $productName. Nutrition is incomplete or its preparation basis needs checking. Open the label, then enter nutrition manually.")
+
     class Offline : BarcodeLookupException("No internet connection, so the barcode couldn't be looked up.")
     class Other(detail: String) : BarcodeLookupException(detail)
 }
 
-class OpenFoodFactsService {
+class OpenFoodFactsService(private val cache: com.kalotracker.app.core.database.dao.PersonalDao? = null,
+    private val catalogLoader: (() -> IndianSnackCatalog)? = null) {
 
-    suspend fun getProductByBarcode(barcode: String): Result<ScannedFoodProduct> =
+    private val catalog by lazy { catalogLoader?.invoke() }
+
+    suspend fun getProductByBarcode(barcode: String, refresh: Boolean = false): Result<ScannedFoodProduct> =
         withContext(Dispatchers.IO) {
             val cleaned = barcode.trim()
             if (cleaned.isBlank() || !cleaned.all { it.isDigit() }) {
                 return@withContext Result.failure(BarcodeLookupException.Other("That doesn't look like a valid barcode."))
             }
 
+            // Known starter records keep their preparation/confirmation rules on every path.
+            val local = catalog?.lookup(cleaned)
+            if (local != null) return@withContext local
+            val cached = runCatching { cache?.cachedBarcode(cleaned) }.getOrNull()?.let { runCatching {
+                com.kalotracker.app.core.data.food.PersonalFood.json.decodeFromString<ScannedFoodProduct>(it.payload).copy(fromCache = true)
+            }.getOrNull() }
+            if (cached != null && !refresh) return@withContext Result.success(cached)
             val conn = try {
                 URL("https://world.openfoodfacts.org/api/v2/product/$cleaned.json").openConnection() as HttpURLConnection
             } catch (e: Exception) {
@@ -58,15 +76,20 @@ class OpenFoodFactsService {
                 when (val code = conn.responseCode) {
                     200 -> {
                         val text = conn.inputStream.bufferedReader().use { it.readText() }
-                        Result.success(parseProduct(cleaned, JSONObject(text)).getOrElse {
+                        val product = parseProduct(cleaned, JSONObject(text)).getOrElse {
                             return@withContext Result.failure(it)
-                        })
+                        }
+                        runCatching { cache?.putBarcodes(listOf(com.kalotracker.app.core.database.entity.BarcodeCacheEntity(cleaned,
+                            com.kalotracker.app.core.data.food.PersonalFood.json.encodeToString(ScannedFoodProduct.serializer(), product), System.currentTimeMillis()))) }
+                        Result.success(product)
                     }
                     404 -> Result.failure(BarcodeLookupException.NotFound(cleaned))
                     else -> Result.failure(BarcodeLookupException.Other("Lookup failed (HTTP $code). Try again."))
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: IOException) {
-                Result.failure(BarcodeLookupException.Offline())
+                if (cached != null) Result.success(cached) else Result.failure(BarcodeLookupException.Offline())
             } catch (e: Exception) {
                 Result.failure(BarcodeLookupException.Other(e.localizedMessage ?: "Lookup failed."))
             } finally {
@@ -89,14 +112,16 @@ class OpenFoodFactsService {
                 nutriments.has("energy_100g") -> nutriments.optDouble("energy_100g") / 4.184 // kJ -> kcal
                 else -> Double.NaN
             }
-            if (kcal.isNaN() || kcal < 0) {
+            if (!kcal.isFinite() || kcal < 0 || kcal > Int.MAX_VALUE) {
                 return Result.failure(BarcodeLookupException.NoNutritionData(barcode))
             }
 
             val name = product.optString("product_name").ifBlank { product.optString("product_name_en") }
                 .ifBlank { "Product $barcode" }
-            val serving = product.optDouble("serving_quantity", 0.0).toFloat().takeIf { it > 0f } ?: 100f
+            val serving = product.optDouble("serving_quantity", 0.0).toFloat().takeIf { it.isFinite() && it > 0f } ?: 100f
 
+            val macros = listOf("proteins_100g", "carbohydrates_100g", "fat_100g").map { nutriments.optDouble(it, 0.0).toFloat() }
+            if (macros.any { !it.isFinite() || it < 0f }) return Result.failure(BarcodeLookupException.Other("Invalid label nutrition."))
             return Result.success(
                 ScannedFoodProduct(
                     barcode = barcode,

@@ -6,6 +6,8 @@ import com.kalotracker.app.core.database.entity.MealEntity
 import com.kalotracker.app.core.database.entity.WaterLogEntity
 import com.kalotracker.app.core.database.entity.WeightLogEntity
 import com.kalotracker.app.core.database.entity.WorkoutEntity
+import com.kalotracker.app.core.database.entity.*
+import com.kalotracker.app.core.data.food.PersonalFood
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -20,13 +22,22 @@ data class BackupFile(
     val meals: List<BackupMeal> = emptyList(),
     val workouts: List<BackupWorkout> = emptyList(),
     val water: List<BackupWater> = emptyList(),
-    val weights: List<BackupWeight> = emptyList()
+    val weights: List<BackupWeight> = emptyList(),
+    val dayStatus: List<DayStatusEntity> = emptyList(),
+    val goalHistory: List<GoalHistoryEntity> = emptyList(),
+    val savedFoods: List<SavedFoodEntity> = emptyList(),
+    val barcodes: List<BarcodeCacheEntity> = emptyList(),
+    val routines: List<WorkoutRoutineEntity> = emptyList(),
+    val preferences: BackupPreferences? = null
 ) {
     companion object {
         const val APP_ID = "kalo"
-        const val CURRENT_VERSION = 1
+        const val CURRENT_VERSION = 2
     }
 }
+
+@Serializable
+data class BackupPreferences(val model: String, val reminderEnabled: Boolean, val reminderHour: Int, val reminderMinute: Int, val appearance: String = "SYSTEM")
 
 @Serializable
 data class BackupProfile(
@@ -49,7 +60,8 @@ data class BackupMeal(
     val totalFatGrams: Float,
     val notes: String? = null,
     val timestamp: Long,
-    val items: List<BackupFoodItem> = emptyList()
+    val items: List<BackupFoodItem> = emptyList(),
+    val photoEntry: String? = null
 )
 
 @Serializable
@@ -72,7 +84,8 @@ data class BackupWorkout(
     val durationMinutes: Int,
     val estimatedCaloriesBurned: Int,
     val timestamp: Long,
-    val sets: List<BackupSet> = emptyList()
+    val sets: List<BackupSet> = emptyList(),
+    val exercisesJson: String = "[]"
 )
 
 @Serializable
@@ -116,13 +129,72 @@ object BackupCodec {
         if (file.version > BackupFile.CURRENT_VERSION) {
             throw BackupFormatException("This backup is from a newer version of Kalo. Update the app to import it.")
         }
+        if (file.version < 1) throw BackupFormatException("This backup version is not supported.")
         if (file.meals.any { it.id.isBlank() || it.items.any { i -> i.id.isBlank() } } ||
             file.workouts.any { it.id.isBlank() || it.sets.any { s -> s.id.isBlank() } } ||
             file.water.any { it.id.isBlank() } || file.weights.any { it.id.isBlank() }
         ) {
             throw BackupFormatException("The backup contains records without ids and can't be imported safely.")
         }
+        validate(file)
         return file
+    }
+
+    private fun validate(file: BackupFile) {
+        fun unique(ids: List<String>) = ids.size == ids.toSet().size
+        if (!unique(file.meals.map { it.id }) || !unique(file.meals.flatMap { it.items }.map { it.id }) ||
+            !unique(file.workouts.map { it.id }) || !unique(file.workouts.flatMap { it.sets }.map { it.id }) ||
+            !unique(file.water.map { it.id }) || !unique(file.weights.map { it.id })) {
+            throw BackupFormatException("The backup contains duplicate record ids.")
+        }
+        fun nonnegative(value: Float) = value.isFinite() && value >= 0f
+        val invalidMeal = file.meals.any { m ->
+            m.title.isBlank() || m.totalCalories < 0 || !nonnegative(m.totalProteinGrams) ||
+                !nonnegative(m.totalCarbsGrams) || !nonnegative(m.totalFatGrams) || m.items.any { i ->
+                    i.name.isBlank() || !i.portionGrams.isFinite() || i.portionGrams <= 0f ||
+                        i.calories < 0 || !nonnegative(i.protein) || !nonnegative(i.carbs) ||
+                        !nonnegative(i.fat) || !i.confidence.isFinite() || i.confidence !in 0f..1f
+                }
+        }
+        val invalidWorkout = file.workouts.any { w ->
+            w.title.isBlank() || w.type !in setOf("STRENGTH", "CARDIO") || w.durationMinutes <= 0 ||
+                w.estimatedCaloriesBurned < 0 || w.sets.any { s ->
+                    s.exerciseName.isBlank() || s.setNumber <= 0 || !nonnegative(s.weightKg) || s.reps < 0
+                }
+        }
+        if (invalidMeal || invalidWorkout || file.water.any { it.milliliters <= 0 } ||
+            file.weights.any { !it.weightKg.isFinite() || it.weightKg !in 20f..350f }) {
+            throw BackupFormatException("The backup contains invalid log values. No data was imported.")
+        }
+        if (!unique(file.dayStatus.map { it.date }) || !unique(file.goalHistory.map { it.date }) ||
+            !unique(file.savedFoods.map { it.id }) || !unique(file.barcodes.map { it.barcode }) || !unique(file.routines.map { it.id }))
+            throw BackupFormatException("Duplicate library/history ids.")
+        try {
+            file.dayStatus.forEach { java.time.LocalDate.parse(it.date) }
+            file.goalHistory.forEach { g ->
+                java.time.LocalDate.parse(g.date)
+                require(com.kalotracker.app.core.util.validateGoalInputs(g.calories.toString(),g.protein.toString(),g.carbs.toString(),g.fat.toString(),"0",g.waterMl.toString()) == null)
+                require(g.goal in setOf("LOSE","MAINTAIN","GAIN"))
+            }
+            file.savedFoods.forEach(PersonalFood::validate)
+            file.barcodes.forEach { require(it.barcode.isNotBlank() && it.barcode.all(Char::isDigit));
+                val p = PersonalFood.json.decodeFromString<com.kalotracker.app.core.network.ScannedFoodProduct>(it.payload)
+                require(p.barcode == it.barcode && p.caloriesPer100g >= 0 && p.servingSizeGrams.isFinite() && p.servingSizeGrams > 0f)
+                require(listOf(p.proteinPer100g,p.carbsPer100g,p.fatPer100g).all { v -> v.isFinite() && v >= 0f })
+            }
+            file.routines.forEach { require(it.id.isNotBlank() && it.name.isNotBlank());
+                com.kalotracker.app.feature.workout.validateRoutinePayload(it.payload)
+            }
+            file.preferences?.let { require(it.reminderHour in 0..23 && it.reminderMinute in 0..59 && it.model.isNotBlank() && it.appearance in setOf("SYSTEM", "LIGHT", "DARK")) }
+            file.meals.forEach { require(it.photoEntry == null || it.photoEntry == ArchiveCodec.photoName(it.id)) }
+        } catch (_: Exception) { throw BackupFormatException("Invalid library, history, settings or photo data.") }
+        file.workouts.filter { it.exercisesJson != "[]" }.forEach { try { com.kalotracker.app.feature.workout.validateRoutinePayload(it.exercisesJson) } catch (_: Exception) { throw BackupFormatException("Invalid workout session.") } }
+        file.profile?.let { p ->
+            val error = com.kalotracker.app.core.util.validateGoalInputs(p.calories.toString(),
+                p.protein.toString(), p.carbs.toString(), p.fat.toString(), p.steps.toString(), p.waterMl.toString())
+            if (error != null || p.goal !in setOf("LOSE", "MAINTAIN", "GAIN"))
+                throw BackupFormatException("The backup contains invalid goals. No data was imported.")
+        }
     }
 
     // ---- entity mapping ----
@@ -149,12 +221,13 @@ object BackupCodec {
     fun toBackupWorkout(w: WorkoutEntity, sets: List<ExerciseSetEntity>) = BackupWorkout(
         id = w.id, title = w.title, type = w.type, durationMinutes = w.durationMinutes,
         estimatedCaloriesBurned = w.estimatedCaloriesBurned, timestamp = w.timestamp,
-        sets = sets.map { BackupSet(it.id, it.exerciseName, it.setNumber, it.weightKg, it.reps, it.isCompleted) }
+        sets = sets.map { BackupSet(it.id, it.exerciseName, it.setNumber, it.weightKg, it.reps, it.isCompleted) },
+        exercisesJson = w.exercisesJson
     )
 
     fun toWorkoutEntity(w: BackupWorkout) = WorkoutEntity(
         id = w.id, title = w.title, type = w.type, durationMinutes = w.durationMinutes,
-        estimatedCaloriesBurned = w.estimatedCaloriesBurned, timestamp = w.timestamp
+        estimatedCaloriesBurned = w.estimatedCaloriesBurned, timestamp = w.timestamp, exercisesJson = w.exercisesJson
     )
 
     fun toSetEntities(w: BackupWorkout) = w.sets.map {

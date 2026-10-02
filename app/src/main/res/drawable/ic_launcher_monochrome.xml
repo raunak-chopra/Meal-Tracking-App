@@ -1,0 +1,7 @@
+<!-- Concept handoff. Verify approved mark, masks and densities before integration. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <group android:scaleX="0.66" android:scaleY="0.66" android:translateX="21" android:translateY="21">
+        <path android:pathData="M78,68 A34,34 0,1 1,66 20" android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeWidth="11" android:strokeLineCap="round"/>
+        <path android:pathData="M81,30 A34,34 0,0 1,85 49" android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeWidth="11" android:strokeLineCap="round"/>
+    </group>
+</vector>

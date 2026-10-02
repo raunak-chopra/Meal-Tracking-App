@@ -28,6 +28,7 @@ import java.time.ZoneId
 
 data class TrendsUiState(
     val rangeDays: Int = 7,
+    val habits: HabitSummary = HabitSummary(),
     val isLoading: Boolean = true,
     val stats: TrendStats? = null,
     val targets: NutritionTargets = NutritionTargets(2200, 160, 2500),
@@ -44,6 +45,7 @@ data class TrendsUiState(
 )
 
 class TrendsViewModel(
+    private val personalDao: com.kalotracker.app.core.database.dao.PersonalDao,
     private val mealRepository: MealRepository,
     private val workoutRepository: WorkoutRepository,
     private val waterRepository: WaterRepository,
@@ -56,7 +58,21 @@ class TrendsViewModel(
     private val _uiState = MutableStateFlow(TrendsUiState(aiConfigured = appSettings.ai.value.isConfigured))
     val uiState: StateFlow<TrendsUiState> = _uiState.asStateFlow()
 
+    private var refreshJob: kotlinx.coroutines.Job? = null
+    private var evidenceDays = emptyList<com.kalotracker.app.core.ai.DayTotals>()
+    fun refresh() {
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch {
+            try { loadRange() } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (_: Exception) { _uiState.update { it.copy(isLoading = false, insights = listOf("Could not read trends. Reopen this screen to retry."), goalSuggestion = null, stats = null) } }
+        }
+    }
     init {
+        viewModelScope.launch { personalDao.observeDays().collect { refresh() } }
+        viewModelScope.launch { userProfileRepository.history.collect { refresh() } }
+        viewModelScope.launch { mealRepository.getMealsForDay(0, Long.MAX_VALUE).collect { refresh() } }
+        viewModelScope.launch { waterRepository.getWaterLogsForDay(0, Long.MAX_VALUE).collect { refresh() } }
+        viewModelScope.launch { workoutRepository.getWorkoutsForDay(0, Long.MAX_VALUE).collect { refresh() } }
         viewModelScope.launch {
             userProfileRepository.profile.collect { profile ->
                 _uiState.update {
@@ -66,7 +82,7 @@ class TrendsViewModel(
                     )
                 }
                 recomputeGoalSuggestion()
-                loadRange()
+                refresh()
             }
         }
         viewModelScope.launch {
@@ -80,14 +96,14 @@ class TrendsViewModel(
     fun setRange(days: Int) {
         if (days == _uiState.value.rangeDays) return
         _uiState.update { it.copy(rangeDays = days, aiSummary = null, aiError = null) }
-        viewModelScope.launch { loadRange() }
+        refresh()
     }
 
     private suspend fun loadRange() {
         val state = _uiState.value
         val zone = ZoneId.systemDefault()
         val today = LocalDate.now()
-        val start = today.minusDays((state.rangeDays - 1).toLong())
+        val start = today.minusDays(41)
         val startMillis = start.atStartOfDay(zone).toInstant().toEpochMilli()
         val endMillis = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() - 1
 
@@ -95,15 +111,26 @@ class TrendsViewModel(
         val water = waterRepository.getLogsBetween(startMillis, endMillis)
         val workouts = workoutRepository.getWorkoutsBetween(startMillis, endMillis)
 
-        val days = TrendAnalyzer.buildDays(start, today, meals, water, workouts, zone)
-        val stats = TrendAnalyzer.stats(days, state.targets, today)
+        val completed = personalDao.days().filter { it.complete }.map { it.date }.toSet()
+        val history = userProfileRepository.history.value
+        evidenceDays = TrendAnalyzer.buildDays(start, today, meals, water, workouts, zone).map { d ->
+            val goal = history.lastOrNull { it.date <= d.date.toString() }
+            d.copy(complete = d.date.toString() in completed && d.date < today,
+                historicalTargets = goal?.let { NutritionTargets(it.calories, it.protein, it.waterMl) })
+        }
+        val days = evidenceDays.takeLast(state.rangeDays)
+        val stats = TrendAnalyzer.stats(days, state.targets, today, requireComplete = true)
         _uiState.update {
             it.copy(
                 isLoading = false,
                 stats = stats,
-                insights = TrendAnalyzer.insights(stats, state.targets)
+                habits = habitSummary(meals, workouts, today.minusDays(state.rangeDays.toLong() - 1), today, zone),
+                insights = listOf("Averages use ${stats.loggedDays} complete past days. Partial and missing days are excluded.",
+                    "Protein was on target on ${stats.proteinHitDays} complete days, using the goal recorded for each day.",
+                    "${days.count { it.isLogged && !it.complete }} days are partial. Missing historical goals are not inferred.")
             )
         }
+        recomputeGoalSuggestion()
     }
 
     private fun recomputeGoalSuggestion() {
@@ -111,7 +138,9 @@ class TrendsViewModel(
         // Use the last 6 weeks so the trend reflects current behaviour, not old history.
         val cutoff = System.currentTimeMillis() - 42L * 24 * 60 * 60 * 1000
         val points = s.weights.filter { it.timestamp >= cutoff }.map { WeightPoint(it.timestamp, it.weightKg) }
-        val suggestion = GoalAdvisor.suggest(s.profile.goal, GoalAdvisor.weeklyChangeKg(points), s.profile.targetCalories)
+        val currentGoalStart = userProfileRepository.history.value.lastOrNull()?.date ?: LocalDate.now().toString()
+        val suggestion = GoalAdvisor.withEvidence(s.profile.goal, points,
+            evidenceDays.filter { it.date.toString() >= currentGoalStart }, s.profile.targetCalories)
         _uiState.update { it.copy(goalSuggestion = suggestion) }
     }
 
@@ -150,8 +179,8 @@ class TrendsViewModel(
             appendLine("You are a supportive, practical nutrition coach. This is a user's food log for the last ${s.rangeDays} days.")
             appendLine("Targets per day: ${s.targets.calories} kcal, ${s.targets.protein} g protein, ${s.targets.waterMl} ml water. Goal: ${s.profile.goal.label}.")
             appendLine("Daily totals (date: kcal / protein g / water ml / meals / workouts):")
-            stats.days.forEach { d ->
-                appendLine("${d.date}: ${if (d.isLogged) "${d.calories} / ${d.protein.toInt()} / ${d.waterMl} / ${d.mealCount} / ${d.workoutCount}" else "nothing logged"}")
+            stats.days.filter { it.complete }.forEach { d ->
+                appendLine("${d.date} (complete; historical target ${d.historicalTargets?.calories ?: "unknown"} kcal): ${if (d.isLogged) "${d.calories} / ${d.protein.toInt()} / ${d.waterMl} / ${d.mealCount} / ${d.workoutCount}" else "nothing logged"}")
             }
             appendLine("Write 3 short observations about patterns and 2 specific, realistic suggestions. Be kind, not preachy, under 140 words. Do not give medical advice or diagnose. Mention that unlogged days limit accuracy if there are many.")
         }
@@ -170,6 +199,7 @@ class TrendsViewModel(
 }
 
 class TrendsViewModelFactory(
+    private val personalDao: com.kalotracker.app.core.database.dao.PersonalDao,
     private val mealRepository: MealRepository,
     private val workoutRepository: WorkoutRepository,
     private val waterRepository: WaterRepository,
@@ -182,7 +212,7 @@ class TrendsViewModelFactory(
         if (modelClass.isAssignableFrom(TrendsViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
             return TrendsViewModel(
-                mealRepository, workoutRepository, waterRepository, weightRepository,
+                personalDao, mealRepository, workoutRepository, waterRepository, weightRepository,
                 userProfileRepository, appSettings, analysisService
             ) as T
         }

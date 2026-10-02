@@ -1,16 +1,14 @@
 package com.kalotracker.app.core.designsystem.components
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.*
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -18,185 +16,75 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.kalotracker.app.core.designsystem.*
 
 @Composable
-fun MacroSummaryCard(
-    currentCalories: Int,
-    targetCalories: Int,
-    proteinGrams: Int,
-    targetProtein: Int,
-    carbsGrams: Int,
-    targetCarbs: Int,
-    fatGrams: Int,
-    targetFat: Int,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(KaloSurface, RoundedCornerShape(20.dp))
-            .padding(20.dp)
-    ) {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text(
-                        text = "ENERGY REMAINING",
-                        style = KaloTypography.labelSmall,
-                        color = KaloTextSecondary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    val remaining = (targetCalories - currentCalories).coerceAtLeast(0)
-                    Text(
-                        text = "$remaining",
-                        style = KaloTypography.displayLarge,
-                        color = KaloTextPrimary
-                    )
-                    Text(
-                        text = "kcal of $targetCalories target",
-                        style = KaloTypography.bodyMedium,
-                        color = KaloTextSecondary
-                    )
-                }
+fun BrandMark(modifier: Modifier=Modifier.size(32.dp)) {
+    val text=KaloTextPrimary; val accent=KaloAccent
+    val rim = remember { PathParser().parsePathString("M78 68 A34 34 0 1 1 66 20").toPath() }
+    val portion = remember { PathParser().parsePathString("M81 30 A34 34 0 0 1 85 49").toPath() }
+    Canvas(modifier) {
+        scale(size.width/100f, size.height/100f, pivot=Offset.Zero) {
+            drawPath(rim,text,style=Stroke(11f,cap=StrokeCap.Round))
+            drawPath(portion,accent,style=Stroke(11f,cap=StrokeCap.Round))
+        }
+    }
+}
 
-                // Concentric Macro Progress Indicator
-                ConcentricRings(
-                    calorieProgress = (currentCalories.toFloat() / targetCalories).coerceIn(0f, 1f),
-                    proteinProgress = (proteinGrams.toFloat() / targetProtein).coerceIn(0f, 1f),
-                    carbsProgress = (carbsGrams.toFloat() / targetCarbs).coerceIn(0f, 1f),
-                    fatProgress = (fatGrams.toFloat() / targetFat).coerceIn(0f, 1f),
-                    modifier = Modifier.size(110.dp)
-                )
+@Composable
+fun MacroSummaryCard(currentCalories:Int,targetCalories:Int,proteinGrams:Int,targetProtein:Int,
+    carbsGrams:Int,targetCarbs:Int,fatGrams:Int,targetFat:Int,modifier:Modifier=Modifier) {
+    val energy=EnergyDisplay(currentCalories,targetCalories)
+    val large=LocalDensity.current.fontScale>=1.3f
+    Column(modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(20.dp)) {
+        Row(Modifier.fillMaxWidth().background(KaloSurface,RoundedCornerShape(20.dp)).padding(20.dp),
+            verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(16.dp)) {
+            Column(Modifier.weight(1f).semantics(mergeDescendants=true){}) {
+                Text("Energy logged",style=KaloTypography.bodyMedium,color=KaloTextSecondary)
+                Text("$currentCalories kcal",style=KaloTypography.displayLarge,color=KaloTextPrimary)
+                Text(if(targetCalories>0) "of $targetCalories target" else "Historical target unavailable",color=KaloTextSecondary)
+                Spacer(Modifier.height(12.dp))
+                Text(energy.deltaText,style=KaloTypography.bodyLarge,color=KaloAccent)
             }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Linear Macro Breakdown Bars
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                MacroPill(
-                    label = "PROTEIN",
-                    current = proteinGrams,
-                    target = targetProtein,
-                    color = KaloProtein,
-                    modifier = Modifier.weight(1f)
-                )
-                MacroPill(
-                    label = "CARBS",
-                    current = carbsGrams,
-                    target = targetCarbs,
-                    color = KaloCarbs,
-                    modifier = Modifier.weight(1f)
-                )
-                MacroPill(
-                    label = "FAT",
-                    current = fatGrams,
-                    target = targetFat,
-                    color = KaloFat,
-                    modifier = Modifier.weight(1f)
-                )
+            if(!large) DailyArc(energy.progress,Modifier.size(88.dp))
+        }
+        BoxWithConstraints {
+            if(large || maxWidth<340.dp) Column(verticalArrangement=Arrangement.spacedBy(16.dp)) {
+                MacroPill("Protein",proteinGrams,targetProtein,KaloProtein)
+                MacroPill("Carbs",carbsGrams,targetCarbs,KaloCarbs)
+                MacroPill("Fat",fatGrams,targetFat,KaloFat)
+            } else Row(horizontalArrangement=Arrangement.spacedBy(16.dp)) {
+                MacroPill("Protein",proteinGrams,targetProtein,KaloProtein,Modifier.weight(1f))
+                MacroPill("Carbs",carbsGrams,targetCarbs,KaloCarbs,Modifier.weight(1f))
+                MacroPill("Fat",fatGrams,targetFat,KaloFat,Modifier.weight(1f))
             }
         }
     }
 }
 
 @Composable
-fun ConcentricRings(
-    calorieProgress: Float,
-    proteinProgress: Float,
-    carbsProgress: Float,
-    fatProgress: Float,
-    modifier: Modifier = Modifier
-) {
-    val animatedCalories = remember { Animatable(0f) }
-    val animatedProtein = remember { Animatable(0f) }
-    val animatedCarbs = remember { Animatable(0f) }
-    val animatedFat = remember { Animatable(0f) }
-
-    LaunchedEffect(calorieProgress, proteinProgress, carbsProgress, fatProgress) {
-        val animSpec = tween<Float>(durationMillis = 800, easing = FastOutSlowInEasing)
-        animatedCalories.animateTo(calorieProgress, animSpec)
-        animatedProtein.animateTo(proteinProgress, animSpec)
-        animatedCarbs.animateTo(carbsProgress, animSpec)
-        animatedFat.animateTo(fatProgress, animSpec)
-    }
-
-    Canvas(modifier = modifier) {
-        val strokeWidth = 7.dp.toPx()
-        val spacing = 3.dp.toPx()
-
-        val radii = listOf(
-            Triple(KaloCalories, animatedCalories.value, (size.minDimension / 2) - strokeWidth),
-            Triple(KaloProtein, animatedProtein.value, (size.minDimension / 2) - (strokeWidth * 2) - spacing),
-            Triple(KaloCarbs, animatedCarbs.value, (size.minDimension / 2) - (strokeWidth * 3) - (spacing * 2)),
-            Triple(KaloFat, animatedFat.value, (size.minDimension / 2) - (strokeWidth * 4) - (spacing * 3))
-        )
-
-        val center = Offset(size.width / 2, size.height / 2)
-
-        radii.forEach { (color, progress, radius) ->
-            // Background Track
-            drawCircle(
-                color = color.copy(alpha = 0.15f),
-                radius = radius,
-                center = center,
-                style = Stroke(width = strokeWidth)
-            )
-
-            // Progress Arc
-            if (progress > 0f) {
-                drawArc(
-                    color = color,
-                    startAngle = -90f,
-                    sweepAngle = progress * 360f,
-                    useCenter = false,
-                    topLeft = Offset(center.x - radius, center.y - radius),
-                    size = Size(radius * 2, radius * 2),
-                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                )
-            }
-        }
+private fun DailyArc(progress:Float,modifier:Modifier) {
+    val accent=KaloAccent;val track=KaloDivider;val mark=KaloTextPrimary
+    Canvas(modifier.clearAndSetSemantics{}) {
+        val inset=5.dp.toPx();val area=Size(size.width-inset*2,size.height-inset*2)
+        val stroke=Stroke(7.dp.toPx(),cap=StrokeCap.Round)
+        drawArc(track,150f,240f,false,Offset(inset,inset),area,style=stroke)
+        if(progress>0f) drawArc(accent,150f,240f*progress,false,Offset(inset,inset),area,style=stroke)
+        val small=size.minDimension*0.3f
+        drawArc(mark,20f,285f,false,Offset((size.width-small)/2,(size.height-small)/2),Size(small,small),style=Stroke(3.dp.toPx(),cap=StrokeCap.Round))
     }
 }
 
 @Composable
-fun MacroPill(
-    label: String,
-    current: Int,
-    target: Int,
-    color: Color,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .background(KaloSurfaceElevated, RoundedCornerShape(12.dp))
-            .padding(horizontal = 12.dp, vertical = 10.dp)
-    ) {
-        Text(
-            text = label,
-            style = KaloTypography.labelSmall,
-            color = color
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = "${current}g",
-            style = KaloTypography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            color = KaloTextPrimary
-        )
-        Text(
-            text = "/ ${target}g",
-            style = KaloTypography.bodyMedium,
-            color = KaloTextMuted
-        )
+fun MacroPill(label:String,current:Int,target:Int,color:Color,modifier:Modifier=Modifier) {
+    Column(modifier.semantics(mergeDescendants=true){},verticalArrangement=Arrangement.spacedBy(4.dp)) {
+        Text(label,style=KaloTypography.bodyMedium,color=KaloTextSecondary)
+        Text("${current} g",style=KaloTypography.titleMedium,color=KaloTextPrimary)
+        LinearProgressIndicator(progress={ if(target>0) (current.toFloat()/target).coerceIn(0f,1f) else 0f },
+            modifier=Modifier.fillMaxWidth().height(4.dp),color=color,trackColor=KaloDivider,strokeCap=StrokeCap.Round)
+        Text(if(target>0) "of $target g" else "Target unavailable",style=KaloTypography.labelSmall,color=KaloTextSecondary)
     }
 }

@@ -21,7 +21,7 @@ android {
         versionCode = 1
         versionName = "1.0.0"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "com.kalotracker.app.IntegrationRunner"
         vectorDrawables {
             useSupportLibrary = true
         }
@@ -111,6 +111,8 @@ dependencies {
     implementation("androidx.room:room-runtime:$roomVersion")
     implementation("androidx.room:room-ktx:$roomVersion")
     ksp("androidx.room:room-compiler:$roomVersion")
+
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
 
     // Image loading (Coil)
     implementation("io.coil-kt:coil-compose:2.7.0")

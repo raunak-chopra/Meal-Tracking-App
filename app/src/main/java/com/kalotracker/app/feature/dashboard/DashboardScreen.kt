@@ -22,6 +22,10 @@ import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
@@ -58,300 +62,75 @@ fun DashboardScreen(
     onNavigateToWorkout: () -> Unit,
     onNavigateToHealthPermissions: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToEditWorkout: (String) -> Unit,
     onNavigateToEditMeal: (String) -> Unit,
     onNavigateToTrends: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onAddMeal: () -> Unit = onNavigateToManualMeal,
+    onViewMeals: () -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
-    var fabOpen by remember { mutableStateOf(false) }
-
-    LaunchedEffect(state.pendingUndo) {
-        val undo = state.pendingUndo ?: return@LaunchedEffect
-        val result = snackbarHostState.showSnackbar(
-            message = undo.message,
-            actionLabel = "Undo",
-            duration = SnackbarDuration.Long
-        )
-        if (result == SnackbarResult.ActionPerformed) viewModel.undoDelete() else viewModel.dismissUndo()
+    val lifecycleOwner=LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner,viewModel) {
+        val observer=LifecycleEventObserver { _,event -> if(event==Lifecycle.Event.ON_RESUME) viewModel.onResume() }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
-    val dateFormatted = state.selectedDate.format(DateTimeFormatter.ofPattern("EEEE, MMM d"))
-
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        containerColor = KaloBackground,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        floatingActionButton = {
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                if (fabOpen) {
-                    QuickAction("Log workout", Icons.Default.FitnessCenter, KaloTextPrimary) {
-                        fabOpen = false; onNavigateToWorkout()
-                    }
-                    QuickAction("Add food manually", Icons.Default.Restaurant, KaloProtein) {
-                        fabOpen = false; onNavigateToManualMeal()
-                    }
-                    QuickAction("Scan barcode", Icons.Default.CropFree, KaloCarbs) {
-                        fabOpen = false; onNavigateToBarcode()
-                    }
-                }
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    FloatingActionButton(
-                        onClick = { fabOpen = !fabOpen },
-                        containerColor = KaloSurfaceElevated,
-                        contentColor = KaloTextPrimary,
-                        shape = CircleShape,
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (fabOpen) Icons.Default.Close else Icons.Default.Add,
-                            contentDescription = if (fabOpen) "Close menu" else "More ways to log",
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                    ExtendedFloatingActionButton(
-                        onClick = { fabOpen = false; onNavigateToCamera() },
-                        containerColor = KaloTextPrimary,
-                        contentColor = KaloBackground,
-                        shape = RoundedCornerShape(24.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CameraAlt,
-                            contentDescription = "Scan Meal",
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = "Snap Meal", style = KaloTypography.titleMedium)
-                    }
-                }
-            }
+    val snackbar=remember { SnackbarHostState() }
+    LaunchedEffect(state.pendingUndo) {
+        state.pendingUndo?.let { undo ->
+            if(snackbar.showSnackbar(undo.message,"Undo",duration=SnackbarDuration.Long)==SnackbarResult.ActionPerformed) viewModel.undoDelete()
+            else viewModel.dismissUndo()
         }
-    ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(top = 20.dp, bottom = 100.dp)
-        ) {
-            // Header with Date Stepper & Settings Icon
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = if (state.isToday) "TODAY'S HORIZON" else "HISTORICAL HORIZON",
-                            style = KaloTypography.labelSmall,
-                            color = KaloTextSecondary
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = dateFormatted,
-                            style = KaloTypography.headlineMedium,
-                            color = KaloTextPrimary
-                        )
-                    }
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    IconButton(
-                        onClick = onNavigateToTrends,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(KaloSurfaceElevated)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Insights,
-                            contentDescription = "Trends and coaching",
-                            tint = KaloTextPrimary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    IconButton(
-                        onClick = onNavigateToSettings,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(KaloSurfaceElevated)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Settings & Goals",
-                            tint = KaloTextPrimary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    }
+    }
+    LaunchedEffect(state.repeatMessage) { state.repeatMessage?.let { snackbar.showSnackbar(it);viewModel.dismissRepeatMessage() } }
+    Scaffold(modifier=modifier.fillMaxSize(),containerColor=KaloBackground,
+        contentWindowInsets=WindowInsets(0,0,0,0),snackbarHost={SnackbarHost(snackbar)},
+        topBar={ Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal=20.dp,vertical=12.dp),
+            verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+            com.kalotracker.app.core.designsystem.components.BrandMark()
+            Text("Today",style=KaloTypography.titleLarge,modifier=Modifier.weight(1f),color=KaloTextPrimary)
+            IconButton(onClick=onNavigateToSettings,modifier=Modifier.size(48.dp)) { Icon(Icons.Default.Settings,"Settings",tint=KaloTextPrimary) }
+        } }) { padding ->
+        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal=20.dp),
+            verticalArrangement=Arrangement.spacedBy(24.dp),contentPadding=PaddingValues(bottom=24.dp)) {
+            item { Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                Text(state.selectedDate.format(DateTimeFormatter.ofPattern("EEE, d MMMM")),Modifier.weight(1f),color=KaloTextSecondary)
+                IconButton(onClick=viewModel::goToPreviousDay,modifier=Modifier.size(48.dp)) { Icon(Icons.Default.ArrowBack,"Previous day") }
+                IconButton(onClick=viewModel::goToNextDay,modifier=Modifier.size(48.dp)) { Icon(Icons.Default.ArrowForward,"Next day") }
+                if(!state.isToday) TextButton(onClick=viewModel::goToToday) { Text("Today") }
+            } }
+            item { MacroSummaryCard(state.currentCalories,state.targetCalories,state.proteinGrams,state.targetProtein,
+                state.carbsGrams,state.targetCarbs,state.fatGrams,state.targetFat) }
+            item { Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                Text("Your meals",style=KaloTypography.titleMedium,modifier=Modifier.weight(1f),color=KaloTextPrimary)
+                TextButton(onClick=onViewMeals) { Text("View all") }
+            } }
+            if(state.todayMeals.isEmpty()) item { Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                Text("Your day starts here",style=KaloTypography.titleMedium,color=KaloTextPrimary)
+                Text("Add a meal by photo, barcode, search or recent entry. Nothing is saved until you confirm.",color=KaloTextSecondary)
+                TextButton(onClick=onAddMeal) { Text("Add your first meal") }
+            } }
+            items(state.todayMeals,key={it.meal.id}) { meal -> MealItemCard(meal,
+                onDelete={viewModel.deleteMeal(meal)},onEdit={onNavigateToEditMeal(meal.meal.id)},
+                onLogAgain={viewModel.logMealAgain(meal)},canLogAgain=!state.isRepeatingMeal) }
+            item { WaterIntakeCard(state.currentWaterMl,state.targetWaterMl,viewModel::logWater,viewModel::undoLastWaterLog) }
+            item { StepGaugeCard(state.healthData.steps,state.targetSteps,state.healthData.activeCaloriesBurned,
+                state.healthData.syncSource,onNavigateToHealthPermissions,state.healthData.isConnected) }
+            item { Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                Text("Workouts",style=KaloTypography.titleMedium,modifier=Modifier.weight(1f),color=KaloTextPrimary)
+                TextButton(onClick=onNavigateToWorkout) { Text("Log daily fitness") }
+            } }
+            items(state.todayWorkouts,key={it.workout.id}) { workout -> WorkoutItemCard(workout,
+                onEdit={onNavigateToEditWorkout(workout.workout.id)},onDelete={viewModel.deleteWorkout(workout)}) }
+            item { Column {
+                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                    Text(if(state.dayComplete) "Day complete" else "Partial day",Modifier.weight(1f),color=KaloTextPrimary)
+                    Switch(state.dayComplete,viewModel::setDayComplete)
                 }
-            }
-
-            // Date Navigation Bar
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(KaloSurface, RoundedCornerShape(12.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        onClick = { viewModel.goToPreviousDay() },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Previous Day",
-                            tint = KaloTextPrimary
-                        )
-                    }
-
-                    Text(
-                        text = if (state.isToday) "Today" else state.selectedDate.format(DateTimeFormatter.ofPattern("MMM d, yyyy")),
-                        style = KaloTypography.titleMedium,
-                        color = if (state.isToday) KaloProtein else KaloTextPrimary
-                    )
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (!state.isToday) {
-                            TextButton(
-                                onClick = { viewModel.goToToday() },
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                            ) {
-                                Text("Jump to Today", style = KaloTypography.labelSmall, color = KaloProtein)
-                            }
-                        }
-
-                        IconButton(
-                            onClick = { viewModel.goToNextDay() },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ArrowForward,
-                                contentDescription = "Next Day",
-                                tint = KaloTextPrimary
-                            )
-                        }
-                    }
-                }
-            }
-
-            // AI Nutrition Insight Card
-            state.dailyInsight?.let { insight ->
-                item {
-                    DailyInsightCard(insight = insight)
-                }
-            }
-
-            // Macro Concentric Rings & Remaining Energy
-            item {
-                MacroSummaryCard(
-                    currentCalories = state.currentCalories,
-                    targetCalories = state.targetCalories,
-                    proteinGrams = state.proteinGrams,
-                    targetProtein = state.targetProtein,
-                    carbsGrams = state.carbsGrams,
-                    targetCarbs = state.targetCarbs,
-                    fatGrams = state.fatGrams,
-                    targetFat = state.targetFat
-                )
-            }
-
-            // Health Connect Steps Gauge
-            item {
-                StepGaugeCard(
-                    currentSteps = state.healthData.steps,
-                    stepGoal = state.targetSteps,
-                    activeCaloriesBurned = state.healthData.activeCaloriesBurned,
-                    syncSource = state.healthData.syncSource,
-                    isHealthConnected = state.healthData.isConnected,
-                    onConnectHealthClick = onNavigateToHealthPermissions
-                )
-            }
-
-            // Hydration Tracker
-            item {
-                WaterIntakeCard(
-                    currentWaterMl = state.currentWaterMl,
-                    targetWaterMl = state.targetWaterMl,
-                    onAddWater = { ml -> viewModel.logWater(ml) },
-                    onUndoWater = { viewModel.undoLastWaterLog() }
-                )
-            }
-
-            // Activity Stream Header
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "ACTIVITY STREAM",
-                        style = KaloTypography.labelSmall,
-                        color = KaloTextSecondary
-                    )
-                    Text(
-                        text = "${state.todayMeals.size} meals • ${state.todayWorkouts.size} workouts",
-                        style = KaloTypography.labelSmall,
-                        color = KaloTextMuted
-                    )
-                }
-            }
-
-            // Empty State
-            if (state.todayMeals.isEmpty() && state.todayWorkouts.isEmpty()) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(KaloSurface, RoundedCornerShape(16.dp))
-                            .padding(28.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "No entries logged for this day",
-                                style = KaloTypography.titleMedium,
-                                color = KaloTextPrimary
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Snap a photo of your meal or log a workout",
-                                style = KaloTypography.bodyMedium,
-                                color = KaloTextMuted
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Meals Stream
-            items(state.todayMeals) { mealWithItems ->
-                MealItemCard(
-                    mealWithItems = mealWithItems,
-                    onDelete = { viewModel.deleteMeal(mealWithItems) },
-                    onEdit = { onNavigateToEditMeal(mealWithItems.meal.id) },
-                    onLogAgain = { viewModel.logMealAgain(mealWithItems) }
-                )
-            }
-
-            // Workouts Stream
-            items(state.todayWorkouts) { workoutWithSets ->
-                WorkoutItemCard(
-                    workoutWithSets = workoutWithSets,
-                    onDelete = { viewModel.deleteWorkout(workoutWithSets) }
-                )
-            }
+                Text("Mark complete after logging everything. Today and unfinished days stay out of complete-day averages.",color=KaloTextSecondary)
+            } }
+            state.dailyInsight?.let { insight -> item { DailyInsightCard(insight) } }
         }
     }
 }
@@ -416,6 +195,7 @@ fun MealItemCard(
     onDelete: () -> Unit,
     onEdit: () -> Unit,
     onLogAgain: () -> Unit,
+    canLogAgain: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val meal = mealWithItems.meal
@@ -425,7 +205,8 @@ fun MealItemCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .heightIn(min=88.dp)
+            .clip(RoundedCornerShape(20.dp))
             .background(KaloSurface)
             .clickable(onClick = onEdit)
             .padding(16.dp)
@@ -450,21 +231,21 @@ fun MealItemCard(
                                 contentDescription = meal.title,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(RoundedCornerShape(8.dp))
+                                    .size(64.dp)
+                                    .clip(RoundedCornerShape(12.dp))
                                     .background(KaloSurfaceElevated)
                             )
                         }
                     }
 
-                    Column {
+                    Column(Modifier.weight(1f)) {
                         Text(
                             text = meal.title,
                             style = KaloTypography.titleMedium,
                             color = KaloTextPrimary
                         )
                         Text(
-                            text = "${meal.totalCalories} kcal  �  $timeText",
+                            text = "${meal.totalCalories} kcal  ·  $timeText",
                             style = KaloTypography.bodyLarge,
                             color = KaloCalories
                         )
@@ -473,7 +254,8 @@ fun MealItemCard(
 
                 IconButton(
                     onClick = onLogAgain,
-                    modifier = Modifier.size(32.dp)
+                    enabled = canLogAgain,
+                    modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.ContentCopy,
@@ -485,7 +267,7 @@ fun MealItemCard(
 
                 IconButton(
                     onClick = onDelete,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Delete,
@@ -499,7 +281,7 @@ fun MealItemCard(
             Spacer(modifier = Modifier.height(6.dp))
 
             Text(
-                text = "${meal.totalProteinGrams.toInt()}g P • ${meal.totalCarbsGrams.toInt()}g C • ${meal.totalFatGrams.toInt()}g F",
+                text = "${meal.totalProteinGrams.toInt()}g P · ${meal.totalCarbsGrams.toInt()}g C · ${meal.totalFatGrams.toInt()}g F",
                 style = KaloTypography.bodyMedium,
                 color = KaloTextSecondary
             )
@@ -520,6 +302,7 @@ fun MealItemCard(
 @Composable
 fun WorkoutItemCard(
     workoutWithSets: WorkoutWithSets,
+    onEdit: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -543,15 +326,16 @@ fun WorkoutItemCard(
                         color = KaloTextPrimary
                     )
                     Text(
-                        text = "${workout.estimatedCaloriesBurned} kcal burned • ${workout.durationMinutes} min",
+                        text = "${workout.estimatedCaloriesBurned} kcal estimated burn · ${workout.durationMinutes} min",
                         style = KaloTypography.bodyMedium,
                         color = KaloSteps
                     )
                 }
 
+                TextButton(onClick = onEdit) { Text("Edit") }
                 IconButton(
                     onClick = onDelete,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Delete,
@@ -564,7 +348,7 @@ fun WorkoutItemCard(
 
             if (workoutWithSets.sets.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(6.dp))
-                val setsSummary = workoutWithSets.sets.joinToString(" | ") { "Set ${it.setNumber}: ${it.weightKg.toInt()}kg × ${it.reps}" }
+                val setsSummary = workoutWithSets.sets.joinToString(" | ") { "Set ${it.setNumber}: ${it.weightKg.toInt()}kg Ã— ${it.reps}" }
                 Text(
                     text = setsSummary,
                     style = KaloTypography.bodyMedium,

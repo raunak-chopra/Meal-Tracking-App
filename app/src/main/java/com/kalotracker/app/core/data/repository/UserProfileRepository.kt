@@ -1,5 +1,9 @@
 package com.kalotracker.app.core.data.repository
 
+import com.kalotracker.app.core.database.entity.GoalHistoryEntity
+import com.kalotracker.app.core.data.food.PersonalFood
+import kotlinx.serialization.encodeToString
+import java.time.LocalDate
 import android.content.Context
 import android.content.SharedPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +36,37 @@ class UserProfileRepository(context: Context) {
 
     private val _profile = MutableStateFlow(loadProfileFromPrefs())
     val profile: StateFlow<UserProfile> = _profile.asStateFlow()
+    private val _history = MutableStateFlow(runCatching {
+        PersonalFood.json.decodeFromString<List<GoalHistoryEntity>>(prefs.getString("goal_history", "[]")!!)
+    }.getOrDefault(emptyList()).ifEmpty { listOf(historyRow(_profile.value)) })
+    val history: StateFlow<List<GoalHistoryEntity>> = _history.asStateFlow()
+
+    init {
+        check(prefs.edit().putString("goal_history", PersonalFood.json.encodeToString(_history.value)).commit()) { "Could not save goal history." }
+    }
+
+    fun resetHistory() {
+        val rows = listOf(historyRow(_profile.value))
+        check(prefs.edit().putString("goal_history", PersonalFood.json.encodeToString(rows)).commit())
+        _history.value = rows
+    }
+
+    private fun historyRow(p: UserProfile) = GoalHistoryEntity(LocalDate.now().toString(),
+        p.targetCalories, p.targetProtein, p.targetCarbs, p.targetFat, p.targetWaterMl, p.goal.name)
+
+    private fun record(p: UserProfile) {
+        val row = historyRow(p)
+        val updated = (_history.value.filterNot { it.date == row.date } + row).sortedBy { it.date }
+        check(prefs.edit().putString("goal_history", PersonalFood.json.encodeToString(updated)).commit()) { "Could not save goal history." }
+        _history.value = updated
+    }
+
+    fun restoreHistory(rows: List<GoalHistoryEntity>) {
+        if (rows.isEmpty()) return
+        val updated = (_history.value.filterNot { old -> rows.any { it.date == old.date } } + rows).sortedBy { it.date }
+        check(prefs.edit().putString("goal_history", PersonalFood.json.encodeToString(updated)).commit())
+        _history.value = updated
+    }
 
     private fun loadProfileFromPrefs(): UserProfile {
         return UserProfile(
@@ -63,6 +98,7 @@ class UserProfileRepository(context: Context) {
             targetWaterMl = waterMl,
             goal = _profile.value.goal
         )
+        if (updated == _profile.value) return
         prefs.edit()
             .putInt("target_calories", calories)
             .putInt("target_protein", protein)
@@ -72,12 +108,16 @@ class UserProfileRepository(context: Context) {
             .putInt("target_water_ml", waterMl)
             .apply()
 
+        if (updated.copy(targetSteps = _profile.value.targetSteps) != _profile.value) record(updated)
         _profile.value = updated
     }
 
     fun setGoal(goal: GoalType) {
+        if (goal == _profile.value.goal) return
         prefs.edit().putString("goal", goal.name).apply()
-        _profile.value = _profile.value.copy(goal = goal)
+        val updated = _profile.value.copy(goal = goal)
+        record(updated)
+        _profile.value = updated
     }
 
     /** Changes only the calorie target, rescaling macros to keep the current split. */
@@ -87,7 +127,7 @@ class UserProfileRepository(context: Context) {
         val ratio = newCalories.toFloat() / p.targetCalories
         updateTargets(
             calories = newCalories,
-            protein = p.targetProtein,
+            protein = (p.targetProtein * ratio).toInt(),
             carbs = (p.targetCarbs * ratio).toInt(),
             fat = (p.targetFat * ratio).toInt(),
             steps = p.targetSteps,

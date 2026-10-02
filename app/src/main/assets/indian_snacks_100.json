@@ -1,0 +1,1706 @@
+{
+  "retrieved_date": "2026-10-02",
+  "attribution": "Open Food Facts contributors; database ODbL; contents DBCL; photo links CC BY-SA",
+  "products": [
+    {
+      "barcode": "8901058000290",
+      "name": "maggi",
+      "brand": "Nestlé",
+      "pack_size_as_recorded": "70",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 384,
+        "protein_g": 8.2,
+        "carbohydrate_g": 59.6,
+        "fat_g": 12.5,
+        "sugar_g": 1.8,
+        "salt_g": 2.57075
+      },
+      "nutrition_basis": "prepared: requires label review",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/105/800/0290/nutrition_en.9.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901058000290"
+    },
+    {
+      "barcode": "8904004402056",
+      "name": "All in one",
+      "brand": "Haldiram's",
+      "pack_size_as_recorded": "200 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 558.8,
+        "protein_g": 15.36,
+        "carbohydrate_g": 43.12,
+        "fat_g": 36.5,
+        "sugar_g": 0.8,
+        "salt_g": 1.4675
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/400/440/2056/nutrition_fr.9.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8904004402056"
+    },
+    {
+      "barcode": "8904004400694",
+      "name": "Aloo Bhujia",
+      "brand": "Haldiram's",
+      "pack_size_as_recorded": "42 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 562,
+        "protein_g": 8.68,
+        "carbohydrate_g": 46.1,
+        "fat_g": 38.12,
+        "sugar_g": 0.25,
+        "salt_g": 1.5621
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/400/440/0694/nutrition_en.10.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8904004400694"
+    },
+    {
+      "barcode": "8904063240187",
+      "name": "Aloo Bhujia",
+      "brand": "Haldiram's",
+      "pack_size_as_recorded": "21.5g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 577.3,
+        "protein_g": 9.7,
+        "carbohydrate_g": 44.1,
+        "fat_g": 40.1,
+        "sugar_g": 3.7,
+        "salt_g": 2.2725
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/406/324/0187/nutrition_en.16.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8904063240187"
+    },
+    {
+      "barcode": "8906005500366",
+      "name": "Bikaji aloo bujia",
+      "brand": "Bikaji",
+      "pack_size_as_recorded": null,
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 578.99139570225,
+        "protein_g": 10,
+        "carbohydrate_g": 42.5,
+        "fat_g": 40,
+        "sugar_g": 2.5,
+        "salt_g": 2.6625
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/600/550/0366/nutrition_en.8.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8906005500366"
+    },
+    {
+      "barcode": "8906005508904",
+      "name": "Bikaji mobile bhel chowpati bhelpuri",
+      "brand": "Bikaji",
+      "pack_size_as_recorded": "110g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 564,
+        "protein_g": 13,
+        "carbohydrate_g": 45,
+        "fat_g": 37,
+        "sugar_g": 4,
+        "salt_g": 0.9925
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/600/550/8904/nutrition_en.7.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8906005508904"
+    },
+    {
+      "barcode": "8905950002819",
+      "name": "Bikaneri Bhujia",
+      "brand": "Bikaji",
+      "pack_size_as_recorded": "36 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 609,
+        "protein_g": 14,
+        "carbohydrate_g": 37,
+        "fat_g": 45,
+        "sugar_g": 0,
+        "salt_g": 1.995
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/595/000/2819/nutrition_en.7.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8905950002819"
+    },
+    {
+      "barcode": "8906005500090",
+      "name": "Bikaneri Bhujia",
+      "brand": "bikaji",
+      "pack_size_as_recorded": "1 kg",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": null,
+        "protein_g": null,
+        "carbohydrate_g": null,
+        "fat_g": null,
+        "sugar_g": null,
+        "salt_g": null
+      },
+      "nutrition_basis": "unknown: no usable nutrition values",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/600/550/0090/nutrition_en.10.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8906005500090"
+    },
+    {
+      "barcode": "8904004407860",
+      "name": "Chatpata matar",
+      "brand": "Haldiram's",
+      "pack_size_as_recorded": "18 gram",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 444.444444444444,
+        "protein_g": 19.8888888888889,
+        "carbohydrate_g": 57.8333333333333,
+        "fat_g": 13.2222222222222,
+        "sugar_g": 0,
+        "salt_g": 1.3
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/400/440/7860/nutrition_en.11.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8904004407860"
+    },
+    {
+      "barcode": "8904004402247",
+      "name": "Farali Chiwda",
+      "brand": "Haldiram's",
+      "pack_size_as_recorded": "200g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 587,
+        "protein_g": 14.12,
+        "carbohydrate_g": 37.8,
+        "fat_g": 42,
+        "sugar_g": 10,
+        "salt_g": 0.55
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/400/440/2247/nutrition_en.7.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8904004402247"
+    },
+    {
+      "barcode": "8901719125683",
+      "name": "Full Toss Baked",
+      "brand": "Parle",
+      "pack_size_as_recorded": null,
+      "nutrition_per_100g_as_recorded": {
+        "kcal": null,
+        "protein_g": null,
+        "carbohydrate_g": null,
+        "fat_g": null,
+        "sugar_g": null,
+        "salt_g": null
+      },
+      "nutrition_basis": "unknown: no usable nutrition values",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/912/5683/nutrition_en.7.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719125683"
+    },
+    {
+      "barcode": "8904063230010",
+      "name": "Haldiram Bhujia400g",
+      "brand": "Haldiram, Haldiram's",
+      "pack_size_as_recorded": "400g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 571.42857142857,
+        "protein_g": 11.428571428571,
+        "carbohydrate_g": 42.857142857143,
+        "fat_g": 40,
+        "sugar_g": 2.8571428571429,
+        "salt_g": 2
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/406/323/0010/nutrition_en.13.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8904063230010"
+    },
+    {
+      "barcode": "8904004400601",
+      "name": "Haldiram Lite Chiwda",
+      "brand": "Haldiram's",
+      "pack_size_as_recorded": "200 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 542,
+        "protein_g": 8.02,
+        "carbohydrate_g": 56.34,
+        "fat_g": 31.63,
+        "sugar_g": 2.16,
+        "salt_g": 1.77546
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/400/440/0601/nutrition_en.10.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8904004400601"
+    },
+    {
+      "barcode": "8904004400687",
+      "name": "Haldiram's Aloo Bhujia Sev",
+      "brand": "Haldiram's",
+      "pack_size_as_recorded": "20g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 564,
+        "protein_g": 8.97,
+        "carbohydrate_g": 47.71,
+        "fat_g": 37.48,
+        "sugar_g": null,
+        "salt_g": 2.46
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/400/440/0687/nutrition_en.8.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8904004400687"
+    },
+    {
+      "barcode": "8904004400250",
+      "name": "Haldiram's Soya Sticks",
+      "brand": "Haldiram's",
+      "pack_size_as_recorded": "200g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 554,
+        "protein_g": 7.46,
+        "carbohydrate_g": 45,
+        "fat_g": 38.21,
+        "sugar_g": 1.86,
+        "salt_g": 1.5725
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/400/440/0250/nutrition_en.12.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8904004400250"
+    },
+    {
+      "barcode": "8904004404449",
+      "name": "haldirams Boondi 200g",
+      "brand": "Haldiram's",
+      "pack_size_as_recorded": "200g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 593,
+        "protein_g": 13.75,
+        "carbohydrate_g": 39.55,
+        "fat_g": 41.17,
+        "sugar_g": 0,
+        "salt_g": 0.44
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/400/440/4449/nutrition_en.7.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8904004404449"
+    },
+    {
+      "barcode": "8904004400977",
+      "name": "Indian Snacks Mixture",
+      "brand": "Haldiram's",
+      "pack_size_as_recorded": "400 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 533,
+        "protein_g": 16.03,
+        "carbohydrate_g": 46.44,
+        "fat_g": 31.49,
+        "sugar_g": 0,
+        "salt_g": 0.83482
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/400/440/0977/nutrition_en.8.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8904004400977"
+    },
+    {
+      "barcode": "8904004409222",
+      "name": "Instant Bhel",
+      "brand": "Haldiram's",
+      "pack_size_as_recorded": "44 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 570.454545454545,
+        "protein_g": 14.0227272727273,
+        "carbohydrate_g": 43.8409090909091,
+        "fat_g": 36.5,
+        "sugar_g": 8.61363636363636,
+        "salt_g": 0.889
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/400/440/9222/nutrition_en.10.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8904004409222"
+    },
+    {
+      "barcode": "5095136975556",
+      "name": "Karam Karam Masala Bites",
+      "brand": "Bikaji",
+      "pack_size_as_recorded": "60g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": null,
+        "protein_g": null,
+        "carbohydrate_g": null,
+        "fat_g": null,
+        "sugar_g": null,
+        "salt_g": null
+      },
+      "nutrition_basis": "unknown: no usable nutrition values",
+      "label_url": "https://images.openfoodfacts.org/images/products/509/513/697/5556/nutrition_en.24.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/5095136975556"
+    },
+    {
+      "barcode": "8906005509284",
+      "name": "Lite Chiwda",
+      "brand": "Bikaji",
+      "pack_size_as_recorded": null,
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 519,
+        "protein_g": 6,
+        "carbohydrate_g": 60,
+        "fat_g": 28,
+        "sugar_g": 3,
+        "salt_g": 0
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/600/550/9284/nutrition_en.16.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8906005509284"
+    },
+    {
+      "barcode": "8904004400472",
+      "name": "Masala moongfali",
+      "brand": "Haldiram's",
+      "pack_size_as_recorded": null,
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 637,
+        "protein_g": 20.62,
+        "carbohydrate_g": 21.85,
+        "fat_g": 51.91,
+        "sugar_g": 0,
+        "salt_g": 1.0625
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/400/440/0472/nutrition_fr.5.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8904004400472"
+    },
+    {
+      "barcode": "8904004401554",
+      "name": "Masala Sev Murmura",
+      "brand": "Haldiram's",
+      "pack_size_as_recorded": null,
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 535,
+        "protein_g": 8.4,
+        "carbohydrate_g": 57.34,
+        "fat_g": 30.2,
+        "sugar_g": null,
+        "salt_g": 1.2725
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/400/440/1554/nutrition_en.16.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8904004401554"
+    },
+    {
+      "barcode": "8904004403800",
+      "name": "Moong dal",
+      "brand": "Haldiram, Haldiram's",
+      "pack_size_as_recorded": "400 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 476,
+        "protein_g": 21.31,
+        "carbohydrate_g": 50.66,
+        "fat_g": 20.93,
+        "sugar_g": 0,
+        "salt_g": 0.39
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/400/440/3800/nutrition_en.19.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8904004403800"
+    },
+    {
+      "barcode": "8904004402834",
+      "name": "Panchathanthra mix",
+      "brand": "Haldiram's",
+      "pack_size_as_recorded": null,
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 142.208413001912,
+        "protein_g": 1.32,
+        "carbohydrate_g": 10.52,
+        "fat_g": 10.52,
+        "sugar_g": 2.06,
+        "salt_g": 0.24
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/400/440/2834/nutrition_en.8.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8904004402834"
+    },
+    {
+      "barcode": "8901719130236",
+      "name": "Parle Chatkeens Salted Peanuts",
+      "brand": "Parle",
+      "pack_size_as_recorded": "15g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 594,
+        "protein_g": 25.5,
+        "carbohydrate_g": 30.7,
+        "fat_g": 41,
+        "sugar_g": 0,
+        "salt_g": 1.26
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/913/0236/nutrition_en.7.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719130236"
+    },
+    {
+      "barcode": "8906005506979",
+      "name": "potato chips",
+      "brand": "bikaji",
+      "pack_size_as_recorded": "100 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 559,
+        "protein_g": 7,
+        "carbohydrate_g": 52,
+        "fat_g": 36,
+        "sugar_g": 1,
+        "salt_g": 2.75
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/600/550/6979/nutrition_en.11.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8906005506979"
+    },
+    {
+      "barcode": "8906005502254",
+      "name": "Punjabi Tadka",
+      "brand": "Bikaji",
+      "pack_size_as_recorded": "150 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 559,
+        "protein_g": 10,
+        "carbohydrate_g": 43,
+        "fat_g": 11,
+        "sugar_g": 2,
+        "salt_g": 4.885
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/600/550/2254/nutrition_en.7.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8906005502254"
+    },
+    {
+      "barcode": "8904004404630",
+      "name": "salted peanuts",
+      "brand": "haldiram's",
+      "pack_size_as_recorded": "25g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 637,
+        "protein_g": 20.62,
+        "carbohydrate_g": 21.85,
+        "fat_g": 51.91,
+        "sugar_g": 0.9,
+        "salt_g": 1.0625
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/400/440/4630/nutrition_en.9.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8904004404630"
+    },
+    {
+      "barcode": "8904004404661",
+      "name": "salted peanuts",
+      "brand": "Haldiram's",
+      "pack_size_as_recorded": null,
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 637,
+        "protein_g": 20,
+        "carbohydrate_g": 21.85714,
+        "fat_g": 51.91429,
+        "sugar_g": 0.9,
+        "salt_g": 1.05714
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/400/440/4661/nutrition_en.9.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8904004404661"
+    },
+    {
+      "barcode": "8904063253842",
+      "name": "Salted peanuts",
+      "brand": "Haldiram's",
+      "pack_size_as_recorded": "200g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 622.5,
+        "protein_g": 26.7,
+        "carbohydrate_g": 18,
+        "fat_g": 49.3,
+        "sugar_g": 0.5,
+        "salt_g": 1.255
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/406/325/3842/nutrition_en.22.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8904063253842"
+    },
+    {
+      "barcode": "8904004420111",
+      "name": "Soya Sticks",
+      "brand": "Haldiram's",
+      "pack_size_as_recorded": "400g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 564,
+        "protein_g": 7.46,
+        "carbohydrate_g": 45,
+        "fat_g": 38.21,
+        "sugar_g": 1.86,
+        "salt_g": 1.5725
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/400/442/0111/nutrition_en.14.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8904004420111"
+    },
+    {
+      "barcode": "8905950003892",
+      "name": "Soya Sticks",
+      "brand": "Bikaji",
+      "pack_size_as_recorded": "200g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 550,
+        "protein_g": 9,
+        "carbohydrate_g": 50,
+        "fat_g": 35,
+        "sugar_g": 5,
+        "salt_g": 2
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/595/000/3892/nutrition_en.7.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8905950003892"
+    },
+    {
+      "barcode": "8906005505040",
+      "name": "Soya sticks",
+      "brand": "Bikaji",
+      "pack_size_as_recorded": "200",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 551,
+        "protein_g": 6,
+        "carbohydrate_g": 51,
+        "fat_g": 36,
+        "sugar_g": 5,
+        "salt_g": 1.326
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/600/550/5040/nutrition_fr.5.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8906005505040"
+    },
+    {
+      "barcode": "8904004407617",
+      "name": "Taka-tak",
+      "brand": "Haldiram's",
+      "pack_size_as_recorded": null,
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 551,
+        "protein_g": 5.99,
+        "carbohydrate_g": 55.2,
+        "fat_g": 34.06,
+        "sugar_g": 1.5,
+        "salt_g": 1.369
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/400/440/7617/nutrition_fr.5.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8904004407617"
+    },
+    {
+      "barcode": "8904063220424",
+      "name": "Takatak Chatpata Masala",
+      "brand": "Haldiram's",
+      "pack_size_as_recorded": null,
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 543,
+        "protein_g": 7,
+        "carbohydrate_g": 50,
+        "fat_g": 35,
+        "sugar_g": 0.5,
+        "salt_g": 2.0675
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/406/322/0424/nutrition_en.14.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8904063220424"
+    },
+    {
+      "barcode": "8906005504395",
+      "name": "Tana-bana",
+      "brand": "Bikaji",
+      "pack_size_as_recorded": "1 kg",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 534,
+        "protein_g": 11,
+        "carbohydrate_g": 55,
+        "fat_g": 30,
+        "sugar_g": 15,
+        "salt_g": 2.2
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/600/550/4395/nutrition_en.9.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8906005504395"
+    },
+    {
+      "barcode": "8904004403534",
+      "name": "tasty nuts",
+      "brand": "Haldiram's",
+      "pack_size_as_recorded": null,
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 624.28296,
+        "protein_g": 21.24,
+        "carbohydrate_g": 23.34,
+        "fat_g": 49.52,
+        "sugar_g": 0,
+        "salt_g": 1.2325
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/400/440/3534/nutrition_fr.5.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8904004403534"
+    },
+    {
+      "barcode": "8904004403671",
+      "name": "TASTY NUTS Shing Bhujia",
+      "brand": "Haldiram's",
+      "pack_size_as_recorded": "40g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 633.95,
+        "protein_g": 21.24,
+        "carbohydrate_g": 23.34,
+        "fat_g": 49.53,
+        "sugar_g": 0,
+        "salt_g": 1.2325
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/400/440/3671/nutrition_en.11.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8904004403671"
+    },
+    {
+      "barcode": "8901063017702",
+      "name": "50 50 Gol Maal",
+      "brand": "Britannia",
+      "pack_size_as_recorded": null,
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 508,
+        "protein_g": 6.4,
+        "carbohydrate_g": 68.4,
+        "fat_g": 23.2,
+        "sugar_g": 21.8,
+        "salt_g": 1.145
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/301/7702/nutrition_en.16.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063017702"
+    },
+    {
+      "barcode": "8901063017719",
+      "name": "50 50 Golmaal",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "110g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 508,
+        "protein_g": 6.4,
+        "carbohydrate_g": 68.4,
+        "fat_g": 23.2,
+        "sugar_g": 21.8,
+        "salt_g": 1.145
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/301/7719/nutrition_en.7.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063017719"
+    },
+    {
+      "barcode": "8901063017627",
+      "name": "Brit 50-50 maska chaska 40g (20)",
+      "brand": "Britannia",
+      "pack_size_as_recorded": null,
+      "nutrition_per_100g_as_recorded": {
+        "kcal": null,
+        "protein_g": null,
+        "carbohydrate_g": null,
+        "fat_g": null,
+        "sugar_g": null,
+        "salt_g": null
+      },
+      "nutrition_basis": "unknown: no usable nutrition values",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/301/7627/nutrition_en.7.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063017627"
+    },
+    {
+      "barcode": "8901063016613",
+      "name": "Britannia 50 50 SWEET & SALTY",
+      "brand": "Britannia",
+      "pack_size_as_recorded": null,
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 487,
+        "protein_g": 7,
+        "carbohydrate_g": 72,
+        "fat_g": 19,
+        "sugar_g": 19.5,
+        "salt_g": 1.115
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/301/6613/nutrition_en.16.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063016613"
+    },
+    {
+      "barcode": "8901063139336",
+      "name": "Britannia bourbon 100g",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "100g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 493.5,
+        "protein_g": 5,
+        "carbohydrate_g": 72.7,
+        "fat_g": 20.3,
+        "sugar_g": 38.3,
+        "salt_g": 0.119
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/313/9336/nutrition_en.15.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063139336"
+    },
+    {
+      "barcode": "8901063139350",
+      "name": "BRITANNIA bourbon 500g",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "5 x 100 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 493.5,
+        "protein_g": 5,
+        "carbohydrate_g": 72.7,
+        "fat_g": 20.3,
+        "sugar_g": 37,
+        "salt_g": 0.2975
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/313/9350/nutrition_en.14.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063139350"
+    },
+    {
+      "barcode": "8901063092822",
+      "name": "BRITANNIA Good day  BUTTER COOKIES",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "52.5 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 500,
+        "protein_g": 6.8,
+        "carbohydrate_g": 69.1,
+        "fat_g": 21.8,
+        "sugar_g": 20.4,
+        "salt_g": 0.5575
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/309/2822/nutrition_en.14.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063092822"
+    },
+    {
+      "barcode": "8901063004139",
+      "name": "Britannia Good day Chocolate Cookies 400g",
+      "brand": "Britannia",
+      "pack_size_as_recorded": null,
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 512,
+        "protein_g": 6.1,
+        "carbohydrate_g": 68,
+        "fat_g": 24,
+        "sugar_g": 33.4,
+        "salt_g": 0.51
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/300/4139/nutrition_en.13.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063004139"
+    },
+    {
+      "barcode": "8901063162648",
+      "name": "Britannia Marie Gold",
+      "brand": "Britannia",
+      "pack_size_as_recorded": null,
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 445,
+        "protein_g": 7.9,
+        "carbohydrate_g": 79.5,
+        "fat_g": 10.6,
+        "sugar_g": 21.2,
+        "salt_g": 0.79
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/316/2648/nutrition_en.10.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063162648"
+    },
+    {
+      "barcode": "8901063001022",
+      "name": "Britannia nutri choice",
+      "brand": "Britannia",
+      "pack_size_as_recorded": null,
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 492,
+        "protein_g": 8.1,
+        "carbohydrate_g": 70.2,
+        "fat_g": 19.9,
+        "sugar_g": 18.6,
+        "salt_g": 0.56
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/300/1022/nutrition_en.6.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063001022"
+    },
+    {
+      "barcode": "8901063142534",
+      "name": "BRITANNIA nutri Choice",
+      "brand": "BRITANNIA",
+      "pack_size_as_recorded": null,
+      "nutrition_per_100g_as_recorded": {
+        "kcal": null,
+        "protein_g": null,
+        "carbohydrate_g": null,
+        "fat_g": null,
+        "sugar_g": null,
+        "salt_g": null
+      },
+      "nutrition_basis": "unknown: no usable nutrition values",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/314/2534/nutrition_en.3.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063142534"
+    },
+    {
+      "barcode": "8901063142114",
+      "name": "Britannia Nutri Choice Oats",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "75 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 478,
+        "protein_g": 8,
+        "carbohydrate_g": 68.5,
+        "fat_g": 21,
+        "sugar_g": 19.5,
+        "salt_g": 0.385
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/314/2114/nutrition_en.7.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063142114"
+    },
+    {
+      "barcode": "8901063029316",
+      "name": "brittania Jimjam pops",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "350g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 500,
+        "protein_g": 5,
+        "carbohydrate_g": 79.2,
+        "fat_g": 21.7,
+        "sugar_g": 37.3,
+        "salt_g": 0.49
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/302/9316/nutrition_en.23.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063029316"
+    },
+    {
+      "barcode": "8901063158351",
+      "name": "Chunkies Coconut Cookies",
+      "brand": "Britannia",
+      "pack_size_as_recorded": null,
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 541,
+        "protein_g": 4.7,
+        "carbohydrate_g": 62.1,
+        "fat_g": 30.4,
+        "sugar_g": 35.1,
+        "salt_g": 0.33
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/315/8351/nutrition_en.13.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063158351"
+    },
+    {
+      "barcode": "8901719123429",
+      "name": "Fab! Bourbon",
+      "brand": "Parle",
+      "pack_size_as_recorded": null,
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 472,
+        "protein_g": 5.2,
+        "carbohydrate_g": 75.3,
+        "fat_g": 16.7,
+        "sugar_g": 41.9,
+        "salt_g": 0.255
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/912/3429/nutrition_en.7.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719123429"
+    },
+    {
+      "barcode": "8901063093621",
+      "name": "good day",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "90.5g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 509,
+        "protein_g": 6.7,
+        "carbohydrate_g": 67.3,
+        "fat_g": 23.7,
+        "sugar_g": 20.3,
+        "salt_g": 0.55
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/309/3621/nutrition_en.9.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063093621"
+    },
+    {
+      "barcode": "8901063093522",
+      "name": "Good Day - Cashew Cookies",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "52.5 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 512,
+        "protein_g": 7,
+        "carbohydrate_g": 67,
+        "fat_g": 24,
+        "sugar_g": 22,
+        "salt_g": 0
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/309/3522/nutrition_en.12.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063093522"
+    },
+    {
+      "barcode": "8901063092686",
+      "name": "Good Day Butter Cookies (25)",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "60g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 500,
+        "protein_g": 6.8,
+        "carbohydrate_g": 69.5,
+        "fat_g": 21.7,
+        "sugar_g": 20.8,
+        "salt_g": 0.615
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/309/2686/nutrition_en.17.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063092686"
+    },
+    {
+      "barcode": "8901063093089",
+      "name": "Good day Cashew",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "120 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 509,
+        "protein_g": 6.7,
+        "carbohydrate_g": 63.7,
+        "fat_g": 23.7,
+        "sugar_g": 20.3,
+        "salt_g": 0
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/309/3089/nutrition_en.13.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063093089"
+    },
+    {
+      "barcode": "8901063092853",
+      "name": "Good Day cashew cookie",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "30.2 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 504,
+        "protein_g": 7,
+        "carbohydrate_g": 65,
+        "fat_g": 24,
+        "sugar_g": 22,
+        "salt_g": 0.545
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/309/2853/nutrition_en.15.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063092853"
+    },
+    {
+      "barcode": "8901063093287",
+      "name": "Good Day Cashew Cookies",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "200 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 504,
+        "protein_g": 7,
+        "carbohydrate_g": 65,
+        "fat_g": 24,
+        "sugar_g": 22,
+        "salt_g": 0
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/309/3287/nutrition_en.7.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063093287"
+    },
+    {
+      "barcode": "8901063093409",
+      "name": "good day cashew cookies",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "120g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": null,
+        "protein_g": null,
+        "carbohydrate_g": 67,
+        "fat_g": 24,
+        "sugar_g": 22,
+        "salt_g": null
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/309/3409/nutrition_en.10.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063093409"
+    },
+    {
+      "barcode": "8901063093355",
+      "name": "Good Day Cashew Cookies Medium Pack 600g",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "600 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 504,
+        "protein_g": 7,
+        "carbohydrate_g": 65,
+        "fat_g": 24,
+        "sugar_g": 22,
+        "salt_g": 0
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/309/3355/nutrition_en.10.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063093355"
+    },
+    {
+      "barcode": "8901063004122",
+      "name": "GoodDay Choco Chip",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "100 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 493,
+        "protein_g": 5,
+        "carbohydrate_g": 71,
+        "fat_g": 21,
+        "sugar_g": 30,
+        "salt_g": null
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/300/4122/nutrition_en.7.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063004122"
+    },
+    {
+      "barcode": "8901719129988",
+      "name": "Happy happy - Parl",
+      "brand": "Parle",
+      "pack_size_as_recorded": "31.5 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 469,
+        "protein_g": 6.1,
+        "carbohydrate_g": 75.2,
+        "fat_g": 15.9,
+        "sugar_g": 31,
+        "salt_g": 0
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/912/9988/nutrition_en.19.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719129988"
+    },
+    {
+      "barcode": "8901719112492",
+      "name": "Hide & Seek Black Bourbon",
+      "brand": "Parle",
+      "pack_size_as_recorded": "100 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 470,
+        "protein_g": 5.2,
+        "carbohydrate_g": 75.7,
+        "fat_g": 16.3,
+        "sugar_g": 42.8,
+        "salt_g": 0.4325
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/911/2492/nutrition_en.14.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719112492"
+    },
+    {
+      "barcode": "8901719117206",
+      "name": "Hide & Seek Caffé Mocha",
+      "brand": "Parle",
+      "pack_size_as_recorded": "100g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 478,
+        "protein_g": 5.8,
+        "carbohydrate_g": 73.6,
+        "fat_g": 17.8,
+        "sugar_g": 32,
+        "salt_g": 0.355
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/911/7206/nutrition_en.7.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719117206"
+    },
+    {
+      "barcode": "8901063029262",
+      "name": "Jim jam92 g",
+      "brand": "Britannia",
+      "pack_size_as_recorded": null,
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 486,
+        "protein_g": 5,
+        "carbohydrate_g": 73,
+        "fat_g": 19,
+        "sugar_g": 31.8,
+        "salt_g": 0
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/302/9262/nutrition_en.11.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063029262"
+    },
+    {
+      "barcode": "8901063029279",
+      "name": "Jimjam",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "138 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 483,
+        "protein_g": 5,
+        "carbohydrate_g": 73,
+        "fat_g": 19,
+        "sugar_g": 33.5,
+        "salt_g": 0.535
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/302/9279/nutrition_en.21.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063029279"
+    },
+    {
+      "barcode": "8901063029255",
+      "name": "Jimjam 57g (57)",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "57 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 483,
+        "protein_g": 5,
+        "carbohydrate_g": 73,
+        "fat_g": 19,
+        "sugar_g": 32.9,
+        "salt_g": 0
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/302/9255/nutrition_en.3.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063029255"
+    },
+    {
+      "barcode": "8901719135217",
+      "name": "Krackjack",
+      "brand": "Parle",
+      "pack_size_as_recorded": "28.35gm",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 489,
+        "protein_g": null,
+        "carbohydrate_g": 70.5,
+        "fat_g": 19.9,
+        "sugar_g": 19.6,
+        "salt_g": 0.9275
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/913/5217/nutrition_en.6.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719135217"
+    },
+    {
+      "barcode": "8901719135248",
+      "name": "Krackjack",
+      "brand": "Parle",
+      "pack_size_as_recorded": "56.7g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 489,
+        "protein_g": 6.8,
+        "carbohydrate_g": 70.5,
+        "fat_g": 19.9,
+        "sugar_g": 19.6,
+        "salt_g": 0.9275
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/913/5248/nutrition_en.27.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719135248"
+    },
+    {
+      "barcode": "8901063023901",
+      "name": "Marie Gold",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "250",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 445,
+        "protein_g": 8.4,
+        "carbohydrate_g": 78.9,
+        "fat_g": 10.7,
+        "sugar_g": 21.9,
+        "salt_g": 0.7975
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/302/3901/nutrition_en.8.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063023901"
+    },
+    {
+      "barcode": "8901063162426",
+      "name": "Marie gold",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "73 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 445,
+        "protein_g": 8.4,
+        "carbohydrate_g": 78.9,
+        "fat_g": 10.7,
+        "sugar_g": 21.9,
+        "salt_g": 0.8
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/316/2426/nutrition_en.34.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063162426"
+    },
+    {
+      "barcode": "8901063162532",
+      "name": "Marie gold",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "33g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 445,
+        "protein_g": 7.9,
+        "carbohydrate_g": 79.5,
+        "fat_g": 10.6,
+        "sugar_g": 21.2,
+        "salt_g": 0
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/316/2532/nutrition_en.6.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063162532"
+    },
+    {
+      "barcode": "8901063162914",
+      "name": "Marie Gold Biscuit",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "64 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 445,
+        "protein_g": 7.9,
+        "carbohydrate_g": 79.5,
+        "fat_g": 10.6,
+        "sugar_g": 21.2,
+        "salt_g": 0.79
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/316/2914/nutrition_en.15.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063162914"
+    },
+    {
+      "barcode": "8901063012547",
+      "name": "Milk bikis",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "57.5g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": null,
+        "protein_g": null,
+        "carbohydrate_g": null,
+        "fat_g": null,
+        "sugar_g": null,
+        "salt_g": null
+      },
+      "nutrition_basis": "unknown: no usable nutrition values",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/301/2547/nutrition_en.10.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063012547"
+    },
+    {
+      "barcode": "8901063012608",
+      "name": "Milk Bikis",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "33.5g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 454,
+        "protein_g": 7,
+        "carbohydrate_g": 45,
+        "fat_g": 14,
+        "sugar_g": 27,
+        "salt_g": 0.006
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/301/2608/nutrition_en.5.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063012608"
+    },
+    {
+      "barcode": "8901063035102",
+      "name": "milk bikis",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "100 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 500,
+        "protein_g": 7,
+        "carbohydrate_g": 68.5,
+        "fat_g": 22,
+        "sugar_g": 27.7,
+        "salt_g": 0.51
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/303/5102/nutrition_en.14.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063035102"
+    },
+    {
+      "barcode": "8901719135088",
+      "name": "Monaco",
+      "brand": "Parle",
+      "pack_size_as_recorded": null,
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 492,
+        "protein_g": 7.9,
+        "carbohydrate_g": 68.8,
+        "fat_g": 20.6,
+        "sugar_g": 8.4,
+        "salt_g": 2.2275
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/913/5088/nutrition_en.10.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719135088"
+    },
+    {
+      "barcode": "8901063142305",
+      "name": "Nutri Choice",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "1kg",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 485,
+        "protein_g": 8.6,
+        "carbohydrate_g": 68.4,
+        "fat_g": 21,
+        "sugar_g": 14.4,
+        "salt_g": 1.1575
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/314/2305/nutrition_fr.5.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063142305"
+    },
+    {
+      "barcode": "8901063142466",
+      "name": "Nutri Choice Digestive",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "50 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 497,
+        "protein_g": 8.6,
+        "carbohydrate_g": 68.4,
+        "fat_g": 21,
+        "sugar_g": 14.4,
+        "salt_g": null
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/314/2466/nutrition_en.52.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063142466"
+    },
+    {
+      "barcode": "8901063142442",
+      "name": "Nutri Choice Seeds",
+      "brand": "Britannia",
+      "pack_size_as_recorded": "75 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 493,
+        "protein_g": 11,
+        "carbohydrate_g": 63,
+        "fat_g": 23.4,
+        "sugar_g": 13.6,
+        "salt_g": 0.785
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/314/2442/nutrition_en.7.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063142442"
+    },
+    {
+      "barcode": "8901063026278",
+      "name": "Nutri Choice Sugar Free Crackers",
+      "brand": "Britannia",
+      "pack_size_as_recorded": null,
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 463,
+        "protein_g": 10,
+        "carbohydrate_g": 72,
+        "fat_g": 15,
+        "sugar_g": 0,
+        "salt_g": 1.5125
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/106/302/6278/nutrition_en.9.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901063026278"
+    },
+    {
+      "barcode": "8901719107771",
+      "name": "Nutricrunch",
+      "brand": "Parle",
+      "pack_size_as_recorded": "200",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 467,
+        "protein_g": 9.3,
+        "carbohydrate_g": 72.3,
+        "fat_g": 15.6,
+        "sugar_g": 0.3,
+        "salt_g": 1.18
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/910/7771/nutrition_en.12.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719107771"
+    },
+    {
+      "barcode": "8901719130403",
+      "name": "nutriticrunch digestive",
+      "brand": "Parle",
+      "pack_size_as_recorded": "75 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 519,
+        "protein_g": 5.8,
+        "carbohydrate_g": 65,
+        "fat_g": 26.2,
+        "sugar_g": 27.3,
+        "salt_g": 0.56
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/913/0403/nutrition_en.7.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719130403"
+    },
+    {
+      "barcode": "8901719119385",
+      "name": "parle 20,20 Nice sugar",
+      "brand": "Parle",
+      "pack_size_as_recorded": "68.75g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 478,
+        "protein_g": 6.5,
+        "carbohydrate_g": 72.8,
+        "fat_g": 17.9,
+        "sugar_g": 25.2,
+        "salt_g": 0.6075
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/911/9385/nutrition_en.15.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719119385"
+    },
+    {
+      "barcode": "8901719126468",
+      "name": "parle 20-20",
+      "brand": "Parle",
+      "pack_size_as_recorded": null,
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 490,
+        "protein_g": 6.4,
+        "carbohydrate_g": 70.6,
+        "fat_g": 20.2,
+        "sugar_g": 24.4,
+        "salt_g": 0
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/912/6468/nutrition_en.9.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719126468"
+    },
+    {
+      "barcode": "8901719131141",
+      "name": "Parle 20-20 Cashew Cookies",
+      "brand": "Parle",
+      "pack_size_as_recorded": "35 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 495,
+        "protein_g": 7,
+        "carbohydrate_g": 69.1,
+        "fat_g": 21.2,
+        "sugar_g": 23,
+        "salt_g": 0.1836
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/913/1141/nutrition_en.5.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719131141"
+    },
+    {
+      "barcode": "8901719116520",
+      "name": "Parle Bode&seek 120g(26)",
+      "brand": "Parle",
+      "pack_size_as_recorded": "250g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 478,
+        "protein_g": 5.8,
+        "carbohydrate_g": 73.6,
+        "fat_g": 17.8,
+        "sugar_g": 32,
+        "salt_g": 0
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/911/6520/nutrition_en.5.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719116520"
+    },
+    {
+      "barcode": "8901719112393",
+      "name": "Parle G",
+      "brand": "Parle",
+      "pack_size_as_recorded": "55 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": null,
+        "protein_g": null,
+        "carbohydrate_g": null,
+        "fat_g": null,
+        "sugar_g": null,
+        "salt_g": null
+      },
+      "nutrition_basis": "unknown: no usable nutrition values",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/911/2393/nutrition_en.12.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719112393"
+    },
+    {
+      "barcode": "8901719134937",
+      "name": "Parle g dark biscuits",
+      "brand": "Parle",
+      "pack_size_as_recorded": "50 g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 457,
+        "protein_g": 6.4,
+        "carbohydrate_g": 77.5,
+        "fat_g": 13.4,
+        "sugar_g": 33.8,
+        "salt_g": null
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/913/4937/nutrition_en.10.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719134937"
+    },
+    {
+      "barcode": "8901719128608",
+      "name": "parle G Royale",
+      "brand": "parle",
+      "pack_size_as_recorded": "20g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 468.92926,
+        "protein_g": 6.4,
+        "carbohydrate_g": 73.6,
+        "fat_g": 16.5,
+        "sugar_g": 27.3,
+        "salt_g": 0.67
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/912/8608/nutrition_en.12.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719128608"
+    },
+    {
+      "barcode": "8901719105913",
+      "name": "parle hide & seek 120g",
+      "brand": "PARLE",
+      "pack_size_as_recorded": "120g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 479,
+        "protein_g": 5.9,
+        "carbohydrate_g": 73.4,
+        "fat_g": 18,
+        "sugar_g": 32.2,
+        "salt_g": 0
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/910/5913/nutrition_en.9.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719105913"
+    },
+    {
+      "barcode": "8901719124853",
+      "name": "PARLE HIDE AND SEEK",
+      "brand": "PARLE",
+      "pack_size_as_recorded": null,
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 522,
+        "protein_g": 5.2,
+        "carbohydrate_g": 65.1,
+        "fat_g": 26.7,
+        "sugar_g": 31.6,
+        "salt_g": 0.4825
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/912/4853/nutrition_en.9.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719124853"
+    },
+    {
+      "barcode": "8901719125799",
+      "name": "Parle hide and seek milano jazelnut",
+      "brand": "Parle",
+      "pack_size_as_recorded": "60g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 536,
+        "protein_g": 4.3,
+        "carbohydrate_g": 63.4,
+        "fat_g": 29.5,
+        "sugar_g": 33.5,
+        "salt_g": 0.295
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/912/5799/nutrition_en.12.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719125799"
+    },
+    {
+      "barcode": "8901719117213",
+      "name": "Parle HIDEGSEEK",
+      "brand": "Parle",
+      "pack_size_as_recorded": "100g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 496,
+        "protein_g": 6.3,
+        "carbohydrate_g": 69.5,
+        "fat_g": 21.4,
+        "sugar_g": 28.9,
+        "salt_g": null
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/911/7213/nutrition_fr.5.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719117213"
+    },
+    {
+      "barcode": "8901719135156",
+      "name": "PARLE MONACO",
+      "brand": "parle",
+      "pack_size_as_recorded": "185.6",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 492,
+        "protein_g": 7.9,
+        "carbohydrate_g": 68.8,
+        "fat_g": 20.6,
+        "sugar_g": 8.4,
+        "salt_g": 2.2275
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/913/5156/nutrition_en.14.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719135156"
+    },
+    {
+      "barcode": "8901719123801",
+      "name": "Parle MONACO 400g",
+      "brand": "Parle",
+      "pack_size_as_recorded": "400g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": null,
+        "protein_g": null,
+        "carbohydrate_g": null,
+        "fat_g": null,
+        "sugar_g": null,
+        "salt_g": null
+      },
+      "nutrition_basis": "unknown: no usable nutrition values",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/912/3801/nutrition_en.11.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719123801"
+    },
+    {
+      "barcode": "8901719123795",
+      "name": "Parle monaco(200g)",
+      "brand": "parle",
+      "pack_size_as_recorded": "200 gm",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 492,
+        "protein_g": 7.9,
+        "carbohydrate_g": 68.8,
+        "fat_g": 20.6,
+        "sugar_g": 8.4,
+        "salt_g": 2.2275
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/912/3795/nutrition_en.5.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719123795"
+    },
+    {
+      "barcode": "19017198",
+      "name": "Parle tostea 1kg",
+      "brand": "Parle, Simply Good, Wholesome",
+      "pack_size_as_recorded": "22g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": null,
+        "protein_g": 9.2,
+        "carbohydrate_g": 72.7,
+        "fat_g": null,
+        "sugar_g": 0,
+        "salt_g": 0.1
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/000/001/901/7198/nutrition_en.18.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/19017198"
+    },
+    {
+      "barcode": "8901719128462",
+      "name": "Parle-G",
+      "brand": "Britannia, Parle",
+      "pack_size_as_recorded": "100g",
+      "nutrition_per_100g_as_recorded": {
+        "kcal": 454,
+        "protein_g": 6.9,
+        "carbohydrate_g": 77.3,
+        "fat_g": 13,
+        "sugar_g": 25.5,
+        "salt_g": 0.74
+      },
+      "nutrition_basis": "as sold: community database",
+      "label_url": "https://images.openfoodfacts.org/images/products/890/171/912/8462/nutrition_en.14.400.jpg",
+      "source_url": "https://world.openfoodfacts.org/product/8901719128462"
+    }
+  ]
+}

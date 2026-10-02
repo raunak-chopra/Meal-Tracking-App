@@ -1,6 +1,8 @@
 package com.kalotracker.app.core.database
 
 import android.content.Context
+import com.kalotracker.app.core.database.entity.*
+import com.kalotracker.app.core.database.dao.PersonalDao
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -22,12 +24,14 @@ import com.kalotracker.app.core.database.entity.WorkoutEntity
         WorkoutEntity::class,
         ExerciseSetEntity::class,
         WaterLogEntity::class,
+        DayStatusEntity::class, GoalHistoryEntity::class, SavedFoodEntity::class, BarcodeCacheEntity::class, WorkoutRoutineEntity::class,
         WeightLogEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class KaloDatabase : RoomDatabase() {
+    abstract fun personalDao(): PersonalDao
     abstract fun mealDao(): MealDao
     abstract fun workoutDao(): WorkoutDao
     abstract fun waterDao(): WaterDao

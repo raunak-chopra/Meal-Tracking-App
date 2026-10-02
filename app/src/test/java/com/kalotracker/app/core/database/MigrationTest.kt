@@ -16,6 +16,33 @@ import java.sql.DriverManager
  */
 class MigrationTest {
 
+    @Test fun migration3to4_preservesExistingHistoryAndMatchesSchema() {
+        open().use { old ->
+            old.exec("PRAGMA foreign_keys=ON")
+            schemaSql(3).forEach { old.exec(it) }
+            old.exec("INSERT INTO meals VALUES ('m','Rice',200,4,45,0.5,'/photo.jpg','note',1000)")
+            old.exec("INSERT INTO food_items VALUES ('f','m','Rice',150,200,4,45,0.5,1)")
+            old.exec("INSERT INTO workouts VALUES ('w','Push','STRENGTH',45,200,2000)")
+            old.exec("INSERT INTO exercise_sets VALUES ('s','w','Bench',1,60,8,1)")
+            old.exec("INSERT INTO water_logs VALUES ('h',250,3000)")
+            old.exec("INSERT INTO weight_logs VALUES ('g',80,4000)")
+            Migrations.MIGRATION_3_4_SQL.forEach { old.exec(it) }
+            for (table in listOf("meals","food_items","workouts","exercise_sets","water_logs","weight_logs")) assertEquals(1, old.count(table))
+            old.createStatement().use { st -> st.executeQuery("SELECT exercisesJson FROM workouts").use { it.next(); assertEquals("[]", it.getString(1)) } }
+            open().use { fresh ->
+                schemaSql(4).forEach { fresh.exec(it) }
+                assertEquals(fresh.tables(), old.tables())
+                for (table in fresh.tables()) {
+                    assertEquals(table, fresh.columns(table), old.columns(table))
+                    assertEquals(table, fresh.foreignKeys(table), old.foreignKeys(table))
+                    assertEquals(table, fresh.indexes(table), old.indexes(table))
+                }
+            }
+            old.exec("DELETE FROM meals WHERE id='m'")
+            assertEquals(0, old.count("food_items"))
+        }
+    }
+
     private fun schemaSql(version: Int): List<String> {
         val path = "/com.kalotracker.app.core.database.KaloDatabase/$version.json"
         val text = javaClass.getResourceAsStream(path)!!.bufferedReader().readText()

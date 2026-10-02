@@ -63,7 +63,7 @@ fun WaterIntakeCard(
                 }
 
                 Text(
-                    text = "$percent% of goal",
+                    text = if(targetWaterMl > 0) "$percent% of goal" else "Target unavailable",
                     style = KaloTypography.bodyMedium,
                     color = if (percent >= 100) KaloWater else KaloTextMuted
                 )
@@ -84,7 +84,7 @@ fun WaterIntakeCard(
                         color = KaloTextPrimary
                     )
                     Text(
-                        text = "of %,d ml target".format(targetWaterMl),
+                        text = if(targetWaterMl > 0) "of %,d ml target".format(targetWaterMl) else "No goal recorded for this day",
                         style = KaloTypography.bodyMedium,
                         color = KaloTextSecondary
                     )
@@ -97,6 +97,7 @@ fun WaterIntakeCard(
                             .clip(RoundedCornerShape(8.dp))
                             .background(KaloSurfaceElevated)
                             .clickable(onClick = onUndoWater)
+                            .heightIn(min = 48.dp)
                             .padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)

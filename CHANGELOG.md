@@ -5,8 +5,14 @@ move it into a dated version section when upgrading the app.
 
 ## [Unreleased]
 
-- Personal foods, recipes, archive backups and daily fitness improvements under development.
-- Public repository documentation and automated version upgrade checks.
+- Personal foods, favorites, editable recipes/templates and nutrition corrections.
+- Photo-inclusive backup archives, scheduled dated backups and restore previews.
+- Multi-exercise workout routines, short daily fitness logs and habit summaries.
+- Photo-meal draft recovery, portion shortcuts and approximate energy displays.
+- Updated appearance, navigation and validation for food and workout forms.
+- Bundled 100-product Indian snack barcode catalog with attribution, confirmation
+  gates and safe handling of incomplete nutrition.
+- Additive Room version 4 migration and expanded regression/integration checks.
 
 ## [1.0.0] - Baseline
 

@@ -6,6 +6,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+enum class Appearance { SYSTEM, LIGHT, DARK }
+
+data class BackupSchedule(val folder: String = "", val enabled: Boolean = false, val lastSuccess: Long = 0, val error: String? = null)
+
 data class AiSettings(
     val apiKey: String = "",
     val model: String = AppSettings.DEFAULT_MODEL
@@ -21,12 +25,16 @@ data class ReminderSettings(
 
 /**
  * Device-local settings that are not nutrition goals: the user's own Gemini key/model
- * and reminder preferences. Stored in app-private preferences (never backed up or exported).
+ * and reminder preferences. API keys and device-specific backup-folder grants are excluded from exports.
  */
 class AppSettings(context: Context) {
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences("kalo_app_settings", Context.MODE_PRIVATE)
+
+    private val _appearance = MutableStateFlow(runCatching { Appearance.valueOf(prefs.getString("appearance", "SYSTEM")!!) }.getOrDefault(Appearance.SYSTEM))
+    val appearance = _appearance.asStateFlow()
+    fun saveAppearance(value: Appearance) { prefs.edit().putString("appearance",value.name).apply(); _appearance.value = value }
 
     private val _ai = MutableStateFlow(
         AiSettings(
@@ -58,6 +66,42 @@ class AppSettings(context: Context) {
             .putInt(KEY_REMINDER_MINUTE, settings.minute)
             .apply()
         _reminder.value = settings
+    }
+
+    private val _backup = MutableStateFlow(BackupSchedule(prefs.getString("backup_folder", "")!!,
+        prefs.getBoolean("backup_enabled", false), prefs.getLong("backup_last", 0), prefs.getString("backup_error", null)))
+    val backup = _backup.asStateFlow()
+    private val backupListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key?.startsWith("backup_") == true) _backup.value = BackupSchedule(prefs.getString("backup_folder", "")!!,
+            prefs.getBoolean("backup_enabled", false), prefs.getLong("backup_last", 0), prefs.getString("backup_error", null))
+    }
+    init { prefs.registerOnSharedPreferenceChangeListener(backupListener) }
+    fun saveBackup(folder: String, enabled: Boolean) {
+        prefs.edit().putString("backup_folder", folder).putBoolean("backup_enabled", enabled).apply()
+        _backup.value = _backup.value.copy(folder = folder, enabled = enabled)
+    }
+    fun backupResult(time: Long, error: String?) {
+        val editor = prefs.edit().putString("backup_error", error)
+        if (time > 0) editor.putLong("backup_last", time)
+        editor.apply()
+    }
+
+    fun fitnessDefaults(): List<String> = listOf(
+        prefs.getString("fitness_minutes", "7") ?: "7",
+        prefs.getString("fitness_weight", "") ?: "",
+        prefs.getString("fitness_effort", "MODERATE") ?: "MODERATE",
+        prefs.getString("fitness_pushups", "20") ?: "20",
+        prefs.getString("fitness_situps", "20") ?: "20",
+        prefs.getString("fitness_crunches", "20") ?: "20"
+    )
+
+    fun saveFitnessDefaults(values: List<String>) {
+        require(values.size == 6)
+        val editor = prefs.edit()
+        listOf("minutes", "weight", "effort", "pushups", "situps", "crunches").zip(values).forEach { (key, value) ->
+            editor.putString("fitness_$key", value)
+        }
+        editor.apply()
     }
 
     companion object {

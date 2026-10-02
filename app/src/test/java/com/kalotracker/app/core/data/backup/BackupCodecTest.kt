@@ -66,4 +66,23 @@ class BackupCodecTest {
         assertTrue(lines[1], lines[1].contains("\"Oats, with \"\"milk\"\"\""))
         assertEquals(2, lines.size)
     }
+
+    @Test fun duplicateIdsAndInvalidValuesAreRejectedBeforeImport() {
+        val valid = sample()
+        assertRejected(BackupCodec.encode(valid.copy(meals = valid.meals + valid.meals)), "duplicate")
+        assertRejected(BackupCodec.encode(valid.copy(water = listOf(BackupWater("w", -1, 5)))), "invalid log")
+        assertRejected(BackupCodec.encode(valid.copy(weights = listOf(BackupWeight("w", 0f, 5)))), "invalid log")
+        assertRejected(BackupCodec.encode(valid.copy(profile = valid.profile!!.copy(calories = -10))), "invalid goals")
+        assertRejected(BackupCodec.encode(valid.copy(version = 0)), "not supported")
+        val bad = valid.meals[0].copy(items = valid.meals[0].items.map { it.copy(portionGrams = -5f) })
+        assertRejected(BackupCodec.encode(valid.copy(meals = listOf(bad))), "invalid log")
+    }
+    @Test fun appearanceIsBackedUpAndOldPreferenceFilesDefaultToSystem() {
+        val prefs=BackupPreferences("gemini-test",false,20,0,"DARK")
+        val encoded=BackupCodec.encode(sample().copy(preferences=prefs))
+        assertEquals("DARK",BackupCodec.decode(encoded).preferences!!.appearance)
+        val old=encoded.replace(",\n        \"appearance\": \"DARK\"", "")
+        assertEquals("SYSTEM",BackupCodec.decode(old).preferences!!.appearance)
+    }
+
 }

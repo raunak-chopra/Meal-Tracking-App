@@ -40,7 +40,7 @@ fun HealthPermissionsScreen(
                 IconButton(
                     onClick = onClose,
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
                         .background(KaloSurfaceElevated)
                 ) {
@@ -57,7 +57,7 @@ fun HealthPermissionsScreen(
                     color = KaloTextSecondary
                 )
 
-                Box(modifier = Modifier.size(40.dp))
+                Box(modifier = Modifier.size(48.dp))
             }
         },
         bottomBar = {
@@ -147,7 +147,7 @@ fun PermissionFeatureCard(
     ) {
         Box(
             modifier = Modifier
-                .size(40.dp)
+                .size(48.dp)
                 .clip(CircleShape)
                 .background(KaloSurfaceElevated),
             contentAlignment = Alignment.Center
