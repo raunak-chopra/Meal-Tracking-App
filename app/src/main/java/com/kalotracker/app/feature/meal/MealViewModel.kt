@@ -34,9 +34,21 @@ data class EditableFoodItem(
     val baseProteinPerGram: Float,
     val baseCarbsPerGram: Float,
     val baseFatPerGram: Float,
-    val confidence: Float
+    val confidence: Float,
+    /** "g" or "ml"; portionGrams holds the amount in this unit. */
+    val unit: String = "g",
+    /** Raw editor text, including invalid/unfinished input; absent in older recovered drafts. */
+    val amountInput: String? = null,
+    /** Name associated with the current values before a rename; local draft metadata only. */
+    val nutritionBasisName: String? = null
 ) {
-    val currentCalories: Int get() = (portionGrams * baseCaloriesPerGram).toInt()
+    val amountText: String get() = amountInput ?: portionGrams.toString().removeSuffix(".0")
+    val hasValidPortion: Boolean get() = parseEditablePortion(amountText)?.let { it == portionGrams } == true
+    val needsNutritionReview: Boolean get() = nutritionBasisName?.trim()?.let { it != name.trim() } == true
+    val isReadyToSave: Boolean get() = hasValidPortion && name.isNotBlank() && !needsNutritionReview
+    fun renamed(value: String): EditableFoodItem = copy(name = value, nutritionBasisName = nutritionBasisName ?: name)
+    fun keepNutrition(): EditableFoodItem = copy(nutritionBasisName = name)
+    val currentCalories: Int get() = kotlin.math.round(portionGrams * baseCaloriesPerGram).toInt()
     val currentProtein: Float get() = portionGrams * baseProteinPerGram
     val currentCarbs: Float get() = portionGrams * baseCarbsPerGram
     val currentFat: Float get() = portionGrams * baseFatPerGram
@@ -46,7 +58,6 @@ data class EditableFoodItem(
 data class MealScanUiState(
     val draftMealId: String = UUID.randomUUID().toString(),
     val draftLoading: Boolean = false,
-    val resumePending: Boolean = false,
     val draftMessage: String? = null,
     val isAnalyzing: Boolean = false,
     val isSaving: Boolean = false,
@@ -62,7 +73,9 @@ data class MealScanUiState(
     val localImageUri: String? = null,
     val isSaved: Boolean = false,
     val errorMessage: String? = null,
-    val canRetry: Boolean = false
+    val canRetry: Boolean = false,
+    /** Food being re-estimated from its typed name; saving waits for it. */
+    val estimatingItemId: String? = null
 ) {
     val totalCalories: Int
         get() = items.sumOf { it.currentCalories } + (if (hasAddedOil) kotlin.math.round(cookingFatGrams * cookingFat.kcalPerGram).toInt() else 0)
@@ -75,13 +88,21 @@ data class MealScanUiState(
 
     val totalFat: Float
         get() = items.map { it.currentFat }.sum() + (if (hasAddedOil) cookingFatGrams * cookingFat.fatPerGram else 0f)
+
+    /** Nothing photographed or estimated yet: the viewfinder is free for a new photo. */
+    val isEmpty: Boolean get() = items.isEmpty() && localImageUri == null && !isAnalyzing && !isSaving
 }
+
+/** Short description of a meal left unfinished earlier, offered without blocking a new photo. */
+data class UnfinishedMeal(val title: String, val calories: Int, val timestamp: Long)
 
 class MealViewModel(
     private val mealRepository: MealRepository,
     private val analysisService: MealAnalysisService,
     private val initialTimestamp: Long = System.currentTimeMillis(),
-    private val draftStore: MealDraftStore? = null
+    private val draftStore: MealDraftStore? = null,
+    /** Holds an earlier unfinished meal while a new photo is taken. */
+    private val parkedStore: MealDraftStore? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MealScanUiState(timestamp = initialTimestamp, draftLoading = draftStore != null))
@@ -97,22 +118,28 @@ class MealViewModel(
     private var galleryJob: kotlinx.coroutines.Job? = null
     private var galleryGeneration = 0L
     private val draftMutex = kotlinx.coroutines.sync.Mutex()
+    private var parked: MealScanUiState? = null
+    private val _unfinished = MutableStateFlow<UnfinishedMeal?>(null)
+    val unfinished: StateFlow<UnfinishedMeal?> = _unfinished.asStateFlow()
 
     init {
         if (draftStore != null) viewModelScope.launch {
             try {
-                val saved = draftStore.load()
-                if (saved != null && mealRepository.getMeal(saved.draftMealId) == null) {
-                    _uiState.value = saved.copy(draftLoading = false, resumePending = true,
-                        isAnalyzing = false, isSaving = false, isSaved = false, errorMessage = null)
-                } else {
-                    draftStore.clear()
-                    _uiState.update { it.copy(draftLoading = false) }
+                val current = draftStore.load()?.takeIf { mealRepository.getMeal(it.draftMealId) == null }
+                val older = try { parkedStore?.load() } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (_: Exception) { null }
+                    ?.takeIf { mealRepository.getMeal(it.draftMealId) == null }
+                // Keep only the most recent unfinished meal; the camera opens ready for a new photo.
+                if (current != null && older != null && older.localImageUri != current.localImageUri) {
+                    older.localImageUri?.let { deletePhoto(it) }
                 }
+                draftStore.clear()
+                val keep = current ?: older
+                if (keep != null) park(keep) else parkedStore?.clear()
+                _uiState.update { it.copy(draftLoading = false) }
             } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
-            catch (_: Exception) { _uiState.update { it.copy(draftLoading = false, draftMessage = "Could not recover the last draft. You can start a new meal.") } }
+            catch (_: Exception) { _uiState.update { it.copy(draftLoading = false, draftMessage = "Could not recover the last unfinished meal.") } }
             _uiState.collect { snapshot ->
-                if (!snapshot.resumePending && !snapshot.draftLoading) {
+                if (!snapshot.draftLoading) {
                     draftMutex.lock()
                     try {
                         if (snapshot == _uiState.value) {
@@ -127,10 +154,32 @@ class MealViewModel(
         }
     }
 
+    private suspend fun park(state: MealScanUiState) {
+        val clean = state.copy(draftLoading = false, isAnalyzing = false, isSaving = false, isSaved = false,
+            errorMessage = null, draftMessage = null, canRetry = false, estimatingItemId = null)
+        parked = clean
+        _unfinished.value = UnfinishedMeal(clean.mealTitle.ifBlank { clean.items.firstOrNull()?.name ?: "Meal" },
+            clean.totalCalories, clean.timestamp)
+        try { parkedStore?.save(clean) }
+        catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (_: Exception) { /* Still resumable while this screen stays open. */ }
+    }
+
+    private suspend fun deletePhoto(path: String) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { File(path).delete() } }
+    }
+
+    /** Brings back the earlier unfinished meal. Only offered while no new photo is in progress. */
     fun resumeDraft() {
+        val draft = parked ?: return
+        if (!_uiState.value.isEmpty || _uiState.value.draftLoading) return
+        parked = null
+        _unfinished.value = null
+        viewModelScope.launch { runCatching { parkedStore?.clear() } }
+        analysisGeneration++
         val generation = ++galleryGeneration
-        _uiState.update { it.copy(resumePending = false) }
-        val path = _uiState.value.localImageUri ?: return
+        _uiState.value = draft
+        val path = draft.localImageUri ?: return
         viewModelScope.launch {
             val bytes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 runCatching { File(path).takeIf { it.length() <= 25 * 1024 * 1024 }?.readBytes() }.getOrNull()
@@ -139,6 +188,18 @@ class MealViewModel(
             lastImageBytes = bytes
             if (bytes == null) _uiState.update { it.copy(draftMessage = "The draft photo is unavailable. Your estimated items can still be saved, or choose another photo.") }
             if (_uiState.value.items.isEmpty() && lastImageBytes != null) runAnalysis()
+        }
+    }
+
+    /** Drops the earlier unfinished meal and its unsaved photo. */
+    fun discardUnfinished() {
+        val draft = parked ?: return
+        parked = null
+        _unfinished.value = null
+        val photo = draft.localImageUri?.takeIf { it != _uiState.value.localImageUri }
+        viewModelScope.launch {
+            runCatching { parkedStore?.clear() }
+            photo?.let { deletePhoto(it) }
         }
     }
 
@@ -170,7 +231,7 @@ class MealViewModel(
     }
 
     fun analyzeCapturedImage(imageBytes: ByteArray, localImageUri: String? = null) {
-        if (_uiState.value.isSaving || _uiState.value.draftLoading || _uiState.value.resumePending) return
+        if (_uiState.value.isSaving || _uiState.value.draftLoading) return
         galleryGeneration++
         galleryJob?.cancel()
         acceptImage(imageBytes, localImageUri)
@@ -188,7 +249,7 @@ class MealViewModel(
 
     /** Re-runs analysis on the same photo, e.g. after failure or after adding a clarifying note. */
     fun retryAnalysis() {
-        if (_uiState.value.isSaving || _uiState.value.resumePending || _uiState.value.draftLoading) return
+        if (_uiState.value.isSaving || _uiState.value.draftLoading) return
         if (lastImageBytes != null) runAnalysis()
     }
 
@@ -207,18 +268,7 @@ class MealViewModel(
 
             if (generation != analysisGeneration) return@launch
             result.onSuccess { response ->
-                val editableItems = response.items.map { item ->
-                    val grams = item.portionGrams.coerceAtLeast(1f)
-                    EditableFoodItem(
-                        name = item.name,
-                        portionGrams = grams,
-                        baseCaloriesPerGram = item.calories / grams,
-                        baseProteinPerGram = item.protein / grams,
-                        baseCarbsPerGram = item.carbs / grams,
-                        baseFatPerGram = item.fat / grams,
-                        confidence = item.confidence
-                    )
-                }
+                val editableItems = response.items.map { it.toEditable() }
 
                 _uiState.update {
                     it.copy(
@@ -242,7 +292,7 @@ class MealViewModel(
     }
 
     fun analyzeImageFromGallery(context: Context, uri: Uri) {
-        if (_uiState.value.isSaving || _uiState.value.draftLoading || _uiState.value.resumePending) return
+        if (_uiState.value.isSaving || _uiState.value.draftLoading) return
         galleryJob?.cancel()
         analysisJob?.cancel()
         analysisGeneration++
@@ -311,17 +361,50 @@ class MealViewModel(
     }
 
     fun adjustItemWeight(itemId: String, multiplier: Float) {
-        updateItem(itemId) { item ->
-            item.copy(portionGrams = (item.portionGrams * multiplier).coerceIn(1f, 5000f))
-        }
+        updateItem(itemId) { it.scaledPortion(multiplier) }
     }
 
     fun setItemGrams(itemId: String, grams: Float) {
-        updateItem(itemId) { it.copy(portionGrams = grams.coerceIn(1f, 5000f)) }
+        if (!grams.isFinite()) return
+        updateItem(itemId) { it.copy(portionGrams = grams.coerceIn(1f, 5000f), amountInput = null) }
+    }
+
+    fun setItemAmountInput(itemId: String, text: String) {
+        updateItem(itemId) { it.withPortionInput(text) }
     }
 
     fun setItemName(itemId: String, name: String) {
-        updateItem(itemId) { it.copy(name = name) }
+        updateItem(itemId) { it.renamed(name) }
+    }
+
+    fun keepItemNutrition(itemId: String) { updateItem(itemId) { if (it.name.isNotBlank()) it.keepNutrition() else it } }
+
+    /** Asks Gemini again for one food using the name as typed, e.g. after correcting "Paneer bharta" to "Chicken bharta". */
+    fun reestimateItem(itemId: String) {
+        val state = _uiState.value
+        val item = state.items.firstOrNull { it.id == itemId } ?: return
+        if (item.name.isBlank() || !item.hasValidPortion || state.isAnalyzing || state.isSaving || state.estimatingItemId != null) return
+        val generation = analysisGeneration
+        _uiState.update { it.copy(estimatingItemId = itemId, errorMessage = null) }
+        viewModelScope.launch {
+            val result = analysisService.analyzeMealText(item.estimateDescription()).mapCatching { item.withEstimate(it) }
+            _uiState.update { current ->
+                if (generation != analysisGeneration) return@update current
+                // A correction or manual nutrition edit made during the request wins.
+                if (current.items.firstOrNull { it.id == itemId } != item) {
+                    return@update current.copy(estimatingItemId = null)
+                }
+                result.fold(
+                    onSuccess = { estimated ->
+                        current.copy(estimatingItemId = null,
+                            items = current.items.map { if (it.id == itemId) estimated else it })
+                    },
+                    onFailure = { error ->
+                        current.copy(estimatingItemId = null, errorMessage = error.localizedMessage ?: "Couldn't re-estimate ${item.name}")
+                    }
+                )
+            }
+        }
     }
 
     fun correctNutrition(itemId: String, kcal: Int, p: Float, c: Float, f: Float) {
@@ -353,7 +436,16 @@ class MealViewModel(
 
     fun saveMeal(onSuccess: () -> Unit) {
         val currentState = _uiState.value
-        if (currentState.items.isEmpty() || currentState.isSaving || currentState.isAnalyzing || currentState.isSaved || currentState.resumePending || currentState.draftLoading) return
+        if (currentState.items.isEmpty() || currentState.isSaving || currentState.isAnalyzing || currentState.isSaved ||
+            currentState.draftLoading || currentState.estimatingItemId != null) return
+        if (currentState.items.any { !it.hasValidPortion }) {
+            _uiState.update { it.copy(errorMessage = "Check each food amount before saving (1–5000 g or ml).") }
+            return
+        }
+        if (currentState.items.any { !it.isReadyToSave }) {
+            _uiState.update { it.copy(errorMessage = "Review renamed foods: update, edit, or explicitly keep their nutrition values before saving.") }
+            return
+        }
 
         saveOperation.launch(viewModelScope, onSuccess) {
             // Persist the stable ID before the DB write so recovery cannot duplicate a committed meal.
@@ -374,7 +466,7 @@ class MealViewModel(
                 totalFatGrams = currentState.totalFat,
                 imageLocalUri = currentState.localImageUri,
                 notes = listOfNotNull(
-                    currentState.notes?.takeIf { it.isNotBlank() }?.let { "AI estimate: $it" },
+                    currentState.notes?.takeIf { it.isNotBlank() }?.let { "From photo: $it" },
                     currentState.userNote.takeIf { it.isNotBlank() }?.let { "Note: $it" }
                 ).joinToString("\n").ifBlank { null },
                 timestamp = currentState.timestamp
@@ -390,7 +482,8 @@ class MealViewModel(
                     protein = item.currentProtein,
                     carbs = item.currentCarbs,
                     fat = item.currentFat,
-                    confidence = item.confidence
+                    confidence = item.confidence,
+                    unit = item.unit
                 )
             } + if (currentState.hasAddedOil) {
                 // Stored as a real item so the meal total always equals the sum of its items.
@@ -446,12 +539,13 @@ class MealViewModelFactory(
     private val mealRepository: MealRepository,
     private val analysisService: MealAnalysisService,
     private val initialTimestamp: Long = System.currentTimeMillis(),
-    private val draftStore: MealDraftStore? = null
+    private val draftStore: MealDraftStore? = null,
+    private val parkedStore: MealDraftStore? = null
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(MealViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return MealViewModel(mealRepository, analysisService, initialTimestamp, draftStore) as T
+            return MealViewModel(mealRepository, analysisService, initialTimestamp, draftStore, parkedStore) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

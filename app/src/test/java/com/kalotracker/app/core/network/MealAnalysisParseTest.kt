@@ -51,9 +51,8 @@ class MealAnalysisParseTest {
     }
 
     @Test
-    fun invalidItemsAreFilteredAndAllInvalidIsRejected() {
-        val mixed = parseGeminiResponse(
-            json,
+    fun invalidItemsRejectTheResultInsteadOfQuietlyOmittingFood() {
+        assertFails<MealAnalysisException.BadResponse>(
             envelope(
                 """{"is_food":true,"meal_title":"x","confidence":1.7,"items":[
                 {"name":"Good","portion_grams":100,"calories":100,"protein":1,"carbs":1,"fat":1},
@@ -62,12 +61,30 @@ class MealAnalysisParseTest {
                 {"name":"Zero weight","portion_grams":0,"calories":10,"protein":1,"carbs":1,"fat":1}]}"""
             )
         )
-        assertEquals(listOf("Good"), mixed.items.map { it.name })
-        assertEquals(1f, mixed.confidence, 0.001f) // clamped
-
-        assertFails<MealAnalysisException.NotFood>(
+        assertFails<MealAnalysisException.BadResponse>(
             envelope("""{"is_food":true,"meal_title":"x","confidence":0.5,"items":[{"name":"Bad","portion_grams":100,"calories":-1,"protein":1,"carbs":1,"fat":1}]}""")
         )
+    }
+
+    @Test
+    fun tooManyFoodsAreRejectedInsteadOfTruncated() {
+        val food = """{"name":"Fixture","portion_grams":100,"calories":100,"protein":1,"carbs":1,"fat":1}"""
+        assertFails<MealAnalysisException.BadResponse>(envelope(
+            """{"is_food":true,"items":[${List(101) { food }.joinToString(",")}]}"""))
+    }
+
+    @Test
+    fun drinksKeepMillilitresAndUnknownUnitsFallBackToGrams() {
+        val r = parseGeminiResponse(
+            json,
+            envelope(
+                """{"is_food":true,"meal_title":"Breakfast","confidence":0.8,"items":[
+                {"name":"Masala chai","portion_grams":150,"calories":90,"protein":3,"carbs":12,"fat":3,"unit":"ml"},
+                {"name":"Poha","portion_grams":180,"calories":250,"protein":5,"carbs":45,"fat":6,"unit":"cups"},
+                {"name":"Banana","portion_grams":100,"calories":89,"protein":1,"carbs":23,"fat":0.3}]}"""
+            )
+        )
+        assertEquals(listOf("ml", "g", "g"), r.items.map { it.unit })
     }
 
     @Test

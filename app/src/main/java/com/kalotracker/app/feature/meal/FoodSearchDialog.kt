@@ -1,9 +1,17 @@
 package com.kalotracker.app.feature.meal
 
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -32,7 +40,8 @@ fun FoodSearchDialog(
     onSelect: (FoodCatalogItem) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var query by remember { mutableStateOf("") }
+    val keyboard = LocalSoftwareKeyboardController.current
+    var query by rememberSaveable { mutableStateOf("") }
     val results = remember(query) { FoodCatalog.search(query) }
 
     AlertDialog(
@@ -44,7 +53,12 @@ fun FoodSearchDialog(
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    label = { Text("Search foods") },
+                    label = { Text("Search common foods") },
+                    trailingIcon = if (query.isNotEmpty()) {
+                        { IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, "Clear search") } }
+                    } else null,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -53,14 +67,14 @@ fun FoodSearchDialog(
                         item { Text("No match in the built-in list.", style = KaloTypography.bodyMedium, color = KaloTextMuted) }
                     }
                     items(results) { food ->
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { onSelect(food); onDismiss() }
-                                .padding(vertical = 10.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                                .heightIn(min = 48.dp)
+                                .clickable(role = Role.Button, onClickLabel = "Add ${food.name}") { keyboard?.hide(); onSelect(food); onDismiss() }
+                                .padding(vertical = 10.dp)
                         ) {
-                            Text(food.name, style = KaloTypography.bodyLarge, color = KaloTextPrimary, modifier = Modifier.weight(1f))
+                            Text(food.name, style = KaloTypography.bodyLarge, color = KaloTextPrimary)
                             Text("${food.caloriesPer100g.toInt()} kcal/100g", style = KaloTypography.bodyMedium, color = KaloTextMuted)
                         }
                     }

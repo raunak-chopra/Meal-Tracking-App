@@ -8,6 +8,6 @@ repository Security tab if enabled. If unavailable, avoid posting exploit detail
 private data publicly and ask the maintainer to enable private reporting.
 
 App records are stored locally. Optional photo analysis sends the selected image and
-prompt to Google Gemini; barcode lookup contacts Open Food Facts. Users supply their
+prompt (and typed meal descriptions) to Google Gemini; barcode lookup contacts Open Food Facts. Users supply their
 own Gemini key in app settings. Backups may contain sensitive records and photos and
 should be stored in a private location.

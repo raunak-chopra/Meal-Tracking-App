@@ -25,7 +25,7 @@ class HabitMealTest {
         val smaller = original.scaledPortion(.75f)
         assertEquals(original.id, smaller.id)
         assertEquals(75f, smaller.portionGrams, .001f)
-        assertEquals(97, smaller.currentCalories)
+        assertEquals(98, smaller.currentCalories) // 97.5 rounds up
         assertEquals(2.25f, smaller.currentProtein, .001f)
         assertEquals(5000f, original.copy(portionGrams = 4999f).scaledPortion(1.25f).portionGrams, .001f)
     }
@@ -77,15 +77,20 @@ class HabitMealTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(dispatcher)
         val disk = MemoryDraft(MealScanUiState(draftMealId = "stable", timestamp = 42, items = listOf(item())))
+        val parkedDisk = MemoryDraft(null)
         val writes = mutableListOf<MealEntity>()
-        val vm = MealViewModel(MealRepository(fakeDao(writes), dispatcher), DeferredAnalysis(), draftStore = disk)
+        val vm = MealViewModel(MealRepository(fakeDao(writes), dispatcher), DeferredAnalysis(), draftStore = disk, parkedStore = parkedDisk)
         val store = ViewModelStore().apply { put("meal", vm) }
         try {
             runCurrent()
-            assertTrue(vm.uiState.value.resumePending)
-            assertEquals(42L, vm.uiState.value.timestamp)
+            // Offered, not forced: the camera starts empty and the old meal waits aside.
+            assertTrue(vm.uiState.value.items.isEmpty())
+            assertEquals(42L, vm.unfinished.value?.timestamp)
+            assertEquals("stable", parkedDisk.value?.draftMealId)
             vm.resumeDraft(); runCurrent()
-            assertFalse(vm.uiState.value.resumePending)
+            assertNull(vm.unfinished.value)
+            assertNull(parkedDisk.value)
+            assertEquals(42L, vm.uiState.value.timestamp)
             var saves = 0
             repeat(3) { vm.saveMeal { saves++ } }; runCurrent()
             assertEquals(1, saves)
@@ -130,10 +135,97 @@ class HabitMealTest {
         val store = ViewModelStore().apply { put("meal", vm) }
         try {
             runCurrent()
-            assertFalse(vm.uiState.value.resumePending)
+            assertNull(vm.unfinished.value)
             assertTrue(vm.uiState.value.items.isEmpty())
             assertNull(disk.value)
         } finally { store.clear(); runCurrent(); Dispatchers.resetMain() }
+    }
+
+    @Test fun newPhotoDoesNotWaitForOrReplaceTheUnfinishedMeal() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        val disk = MemoryDraft(MealScanUiState(draftMealId = "earlier", mealTitle = "Lunch", items = listOf(item())))
+        val parkedDisk = MemoryDraft(null)
+        val service = DeferredAnalysis()
+        val writes = mutableListOf<MealEntity>()
+        val vm = MealViewModel(MealRepository(fakeDao(writes), dispatcher), service, draftStore = disk, parkedStore = parkedDisk)
+        val store = ViewModelStore().apply { put("meal", vm) }
+        try {
+            runCurrent()
+            vm.analyzeCapturedImage(byteArrayOf(1)); runCurrent()
+            service.requests.single().complete(response("Tea")); runCurrent()
+            assertEquals("Tea", vm.uiState.value.mealTitle)
+            vm.resumeDraft(); runCurrent() // ignored while the new meal is open
+            assertEquals("Tea", vm.uiState.value.mealTitle)
+            vm.saveMeal {}; runCurrent()
+            assertEquals(listOf("Tea"), writes.map { it.title })
+            assertEquals("Lunch", vm.unfinished.value?.title)
+            assertEquals("earlier", parkedDisk.value?.draftMealId)
+            vm.resetScan()
+            vm.discardUnfinished(); runCurrent()
+            assertNull(vm.unfinished.value)
+            assertNull(parkedDisk.value)
+        } finally { store.clear(); runCurrent(); Dispatchers.resetMain() }
+    }
+
+    @Test fun editingItemsUpdatesTotalsAndSavedMealMatchesItsItems() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        val service = DeferredAnalysis()
+        val saved = mutableListOf<Pair<MealEntity, List<com.kalotracker.app.core.database.entity.FoodItemEntity>>>()
+        val dao = Proxy.newProxyInstance(MealDao::class.java.classLoader, arrayOf(MealDao::class.java)) { _, method, args ->
+            when (method.name) {
+                "getMealById" -> null
+                "insertMealWithItems" -> {
+                    @Suppress("UNCHECKED_CAST")
+                    saved += (args[0] as MealEntity) to (args[1] as List<com.kalotracker.app.core.database.entity.FoodItemEntity>); Unit
+                }
+                else -> error("Unexpected DAO call: ${method.name}")
+            }
+        } as MealDao
+        val vm = MealViewModel(MealRepository(dao, dispatcher), service)
+        val store = ViewModelStore().apply { put("meal", vm) }
+        try {
+            vm.analyzeCapturedImage(byteArrayOf(1)); runCurrent()
+            service.requests.single().complete(Result.success(MealAnalysisResponse(mealTitle = "Thali", items = listOf(
+                DetectedFoodItem("Rice", 150f, 195, 4f, 42f, 0.5f),
+                DetectedFoodItem("Lassi", 200f, 150, 6f, 20f, 5f, unit = "ml"))))); runCurrent()
+            assertEquals(345, vm.uiState.value.totalCalories)
+
+            val rice = vm.uiState.value.items.first { it.name == "Rice" }
+            vm.setItemGrams(rice.id, 300f) // doubling the amount doubles its nutrition
+            assertEquals(390 + 150, vm.uiState.value.totalCalories)
+            assertEquals(8f + 6f, vm.uiState.value.totalProtein, 0.01f)
+
+            val lassi = vm.uiState.value.items.first { it.name == "Lassi" }
+            vm.correctNutrition(lassi.id, 120, 7f, 14f, 4f) // label values for the current 200 ml
+            assertEquals(390 + 120, vm.uiState.value.totalCalories)
+            vm.setItemGrams(lassi.id, 100f) // corrections scale with the amount afterwards
+            assertEquals(390 + 60, vm.uiState.value.totalCalories)
+
+            vm.removeItem(rice.id)
+            assertEquals(60, vm.uiState.value.totalCalories)
+            vm.setCookingFat(CookingFat.OIL, 14f)
+            assertEquals(60 + 120, vm.uiState.value.totalCalories)
+
+            vm.saveMeal {}; runCurrent()
+            val (meal, items) = saved.single()
+            assertEquals(180, meal.totalCalories)
+            assertEquals(items.sumOf { it.calories }, meal.totalCalories)
+            assertEquals(items.map { it.fat }.sum(), meal.totalFatGrams, 0.01f)
+            assertEquals("ml", items.first { it.name == "Lassi" }.unit)
+        } finally { store.clear(); runCurrent(); Dispatchers.resetMain() }
+    }
+
+    @Test fun itemCaloriesRoundInsteadOfTruncating() {
+        val item = item().copy(portionGrams = 100f, baseCaloriesPerGram = 1.299f)
+        assertEquals(130, item.currentCalories)
+    }
+
+    @Test fun amountsFormatWithoutTrailingZeros() {
+        assertEquals("180 g", formatAmount(180f, "g"))
+        assertEquals("250 ml", formatAmount(250.04f, "ml"))
+        assertEquals("12.5 g", formatAmount(12.5f, "g"))
     }
 
     @Test fun saveIsBlockedWhileAnalysisIsInFlight() = runTest {

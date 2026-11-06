@@ -30,7 +30,9 @@ class KaloApplication : Application() {
     val appSettings by lazy { AppSettings(this) }
     val analysisService by lazy { MealAnalysisService { appSettings.ai.value } }
     val weightRepository by lazy { WeightRepository(database.weightDao()) }
-    val backupManager by lazy { BackupManager(database, userProfileRepository, java.io.File(filesDir, "meals"), appSettings, java.io.File(noBackupFilesDir, "meal-draft.json")) }
+    val backupManager by lazy { BackupManager(database, userProfileRepository, java.io.File(filesDir, "meals"), appSettings,
+        listOf(com.kalotracker.app.feature.meal.MEAL_DRAFT_FILE, com.kalotracker.app.feature.meal.PARKED_MEAL_DRAFT_FILE)
+            .map { java.io.File(noBackupFilesDir, it) }) }
     val waterRepository by lazy { com.kalotracker.app.core.data.repository.WaterRepository(database.waterDao()) }
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

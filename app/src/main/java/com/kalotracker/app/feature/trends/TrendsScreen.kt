@@ -2,6 +2,10 @@ package com.kalotracker.app.feature.trends
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -15,12 +19,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -30,6 +40,7 @@ import com.kalotracker.app.core.ai.DayTotals
 import com.kalotracker.app.core.database.entity.WeightLogEntity
 import com.kalotracker.app.core.designsystem.*
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -90,6 +101,7 @@ fun TrendsScreen(
 
             val stats = state.stats
             if (stats != null) {
+                item { CompleteDaysCard(state, viewModel::setDayComplete) }
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                         StatTile("Streak", "${stats.streak}d", Modifier.weight(1f))
@@ -131,7 +143,7 @@ fun TrendsScreen(
                         modifier = Modifier.fillMaxWidth().background(KaloSurface, RoundedCornerShape(16.dp)).padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("WHAT STANDS OUT", style = KaloTypography.labelSmall, color = KaloTextSecondary)
+                        Text("What stands out", style = KaloTypography.titleMedium, color = KaloTextPrimary)
                         state.insights.forEach { line ->
                             Text("·  $line", style = KaloTypography.bodyMedium, color = KaloTextPrimary)
                         }
@@ -142,6 +154,51 @@ fun TrendsScreen(
             }
 
             item { WeightCard(state, viewModel) }
+        }
+    }
+}
+
+@Composable
+private fun CompleteDaysCard(state: TrendsUiState, onCompleteChange: (LocalDate, Boolean) -> Unit) {
+    var expanded by rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    val days = state.stats?.days.orEmpty().filter {
+        it.date < LocalDate.now() && (it.isLogged || it.complete)
+    }.asReversed()
+    Surface(shape = RoundedCornerShape(16.dp), color = KaloSurface) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Complete days", style = KaloTypography.titleLarge, color = KaloTextPrimary)
+            Text("Only mark a day complete when all its food is logged. Complete past days count toward nutrition averages; you can reopen them here.",
+                style = KaloTypography.bodyMedium, color = KaloTextSecondary)
+            if (days.isEmpty()) {
+                Text("Past days with meals will appear here. Today's log stays out of averages until tomorrow.",
+                    style = KaloTypography.bodyMedium, color = KaloTextMuted)
+            } else {
+                TextButton(onClick = { expanded = !expanded }, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Text(if (expanded) "Hide days" else "Review ${days.size} past ${if (days.size == 1) "day" else "days"}")
+                }
+                if (expanded) days.forEach { day ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp)
+                            .semantics(mergeDescendants = true) {
+                                stateDescription = if (day.complete) "Complete; included in nutrition averages" else "Partial; excluded from nutrition averages"
+                            }
+                            .toggleable(value = day.complete, enabled = state.completionSavingDate == null,
+                                role = Role.Checkbox, onValueChange = { onCompleteChange(day.date, it) })
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Checkbox(checked = day.complete, onCheckedChange = null, enabled = state.completionSavingDate == null)
+                        Column(Modifier.weight(1f)) {
+                            Text(day.date.format(DateTimeFormatter.ofPattern("EEE, d MMM")), style = KaloTypography.titleMedium)
+                            Text("${day.mealCount} ${if (day.mealCount == 1) "meal" else "meals"} · ${day.calories} kcal · ${if (day.complete) "Complete" else "Partial"}",
+                                style = KaloTypography.bodyMedium, color = KaloTextSecondary)
+                        }
+                        if (state.completionSavingDate == day.date) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                    }
+                }
+            }
+            state.completionError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
     }
 }
@@ -168,42 +225,128 @@ private fun ChartCard(
     color: Color
 ) {
     val dateFmt = DateTimeFormatter.ofPattern("MMM d")
+    val detailDateFmt = DateTimeFormatter.ofPattern("EEE, d MMM")
     val emptyColor = KaloBorder
+    var selectedIndex by androidx.compose.runtime.remember(days) { androidx.compose.runtime.mutableStateOf<Int?>(null) }
+    val selectedDay = selectedIndex?.let { days.getOrNull(it) }
+
     Column(
-        modifier = Modifier.fillMaxWidth().background(KaloSurface, RoundedCornerShape(16.dp)).padding(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(KaloSurface, RoundedCornerShape(16.dp))
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Text(title, style = KaloTypography.labelSmall, color = KaloTextSecondary)
-        Text(subtitle, style = KaloTypography.bodyMedium, color = KaloTextMuted)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(title, style = KaloTypography.labelSmall, color = KaloTextSecondary)
+            if (selectedDay != null) {
+                Text(
+                    text = buildString {
+                        append(selectedDay.date.format(detailDateFmt))
+                        append(" · ")
+                        if (!selectedDay.isLogged) {
+                            append("No log")
+                        } else {
+                            append("${value(selectedDay).toInt()}")
+                            dailyTarget(selectedDay)?.toInt()?.let { append(" / $it") }
+                            append(if (selectedDay.complete) " (Complete)" else " (Partial)")
+                        }
+                    },
+                    style = KaloTypography.labelSmall.copy(fontFeatureSettings = TabularFontFeature),
+                    color = color
+                )
+            }
+        }
+        Text(
+            text = if (selectedDay == null) "$subtitle · tap a bar to inspect" else subtitle,
+            style = KaloTypography.bodyMedium,
+            color = KaloTextMuted
+        )
         val targetLineColor = KaloTextSecondary
-        Canvas(modifier = Modifier.fillMaxWidth().height(140.dp)) {
+        val highlightColor = KaloSurfaceElevated
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(140.dp)
+                .pointerInput(days) {
+                    if (days.isNotEmpty()) {
+                        detectTapGestures { offset ->
+                            val idx = ((offset.x / size.width) * days.size).toInt().coerceIn(0, days.lastIndex)
+                            selectedIndex = if (selectedIndex == idx) null else idx
+                        }
+                    }
+                }
+                .pointerInput(days) {
+                    if (days.isNotEmpty()) {
+                        detectHorizontalDragGestures { change, _ ->
+                            val idx = ((change.position.x / size.width) * days.size).toInt().coerceIn(0, days.lastIndex)
+                            selectedIndex = idx
+                        }
+                    }
+                }
+        ) {
             val maxValue = maxOf(target * 1.25f, days.maxOfOrNull { value(it) } ?: 0f, 1f)
             val n = days.size.coerceAtLeast(1)
             val slot = size.width / n
             val barWidth = slot * 0.62f
+            val corner = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx(), 4.dp.toPx())
             days.forEachIndexed { i, day ->
                 val v = value(day)
                 val h = (v / maxValue) * size.height
                 val left = i * slot + (slot - barWidth) / 2f
+                if (selectedIndex == i) {
+                    drawRoundRect(
+                        color = highlightColor,
+                        topLeft = Offset(i * slot, 0f),
+                        size = Size(slot, size.height),
+                        cornerRadius = corner
+                    )
+                }
                 if (day.isLogged) {
-                    drawRect(if (day.complete) color else color.copy(alpha = 0.35f), topLeft = Offset(left, size.height - h), size = Size(barWidth, h))
+                    drawRoundRect(
+                        color = if (day.complete || selectedIndex == i) color else color.copy(alpha = 0.35f),
+                        topLeft = Offset(left, size.height - h),
+                        size = Size(barWidth, h),
+                        cornerRadius = corner
+                    )
                 } else {
                     // Unlogged day: thin stub so gaps are visible rather than looking like 0 intake.
-                    drawRect(emptyColor, topLeft = Offset(left, size.height - 3.dp.toPx()), size = Size(barWidth, 3.dp.toPx()))
+                    drawRoundRect(
+                        color = emptyColor,
+                        topLeft = Offset(left, size.height - 3.dp.toPx()),
+                        size = Size(barWidth, 3.dp.toPx()),
+                        cornerRadius = corner
+                    )
                 }
             }
             days.forEachIndexed { i, day ->
                 dailyTarget(day)?.let { t ->
                     val y = size.height - (t / maxValue) * size.height
-                    drawLine(targetLineColor, Offset(i * slot, y), Offset((i + 1) * slot, y),
-                        strokeWidth = 1.5.dp.toPx())
+                    drawLine(
+                        targetLineColor,
+                        Offset(i * slot, y),
+                        Offset((i + 1) * slot, y),
+                        strokeWidth = 1.5.dp.toPx()
+                    )
                 }
             }
         }
         if (days.isNotEmpty()) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(days.first().date.format(dateFmt), style = KaloTypography.labelSmall, color = KaloTextMuted)
-                Text(days.last().date.format(dateFmt), style = KaloTypography.labelSmall, color = KaloTextMuted)
+                days.forEachIndexed { idx, d ->
+                    if (days.size <= 7 || idx == 0 || idx == days.lastIndex || idx == days.size / 2) {
+                        Text(
+                            text = d.date.format(dateFmt),
+                            style = KaloTypography.labelSmall,
+                            color = if (selectedIndex == idx) KaloTextPrimary else KaloTextMuted,
+                            modifier = Modifier.clickable { selectedIndex = if (selectedIndex == idx) null else idx }
+                        )
+                    }
+                }
             }
         }
     }
@@ -216,7 +359,7 @@ private fun AiSummaryCard(state: TrendsUiState, viewModel: TrendsViewModel, onOp
         modifier = Modifier.fillMaxWidth().background(KaloSurface, RoundedCornerShape(16.dp)).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text("AI WEEKLY SUMMARY", style = KaloTypography.labelSmall, color = KaloTextSecondary)
+        Text("Written summary", style = KaloTypography.titleMedium, color = KaloTextPrimary)
         when {
             !state.aiConfigured -> {
                 Text(
@@ -227,7 +370,7 @@ private fun AiSummaryCard(state: TrendsUiState, viewModel: TrendsViewModel, onOp
                 OutlinedButton(onClick = onOpenSettings) { Text("Open settings") }
             }
             !enoughData -> Text(
-                "Log at least 3 days first.",
+                "Mark at least 3 days complete first.",
                 style = KaloTypography.bodyMedium,
                 color = KaloTextMuted
             )
@@ -235,21 +378,21 @@ private fun AiSummaryCard(state: TrendsUiState, viewModel: TrendsViewModel, onOp
                 if (!state.aiSummary.isNullOrBlank()) {
                     Text(state.aiSummary ?: "", style = KaloTypography.bodyMedium, color = KaloTextPrimary)
                     Text(
-                        "AI-generated from your totals. Not medical advice.",
+                        "Written by Google Gemini from your daily totals and goals. Not medical advice.",
                         style = KaloTypography.labelSmall,
                         color = KaloTextMuted
                     )
                 }
                 if (!state.aiError.isNullOrBlank()) {
-                    Text(state.aiError ?: "", style = KaloTypography.bodyMedium, color = KaloFat)
+                    Text(state.aiError ?: "", style = KaloTypography.bodyMedium, color = KaloError)
                 }
                 Text("Generating sends daily totals and goals to Google Gemini with your key. Saved records stay on this device.", style = KaloTypography.bodySmall, color = KaloTextSecondary)
                 OutlinedButton(onClick = { viewModel.generateAiSummary() }, enabled = !state.isSummarizing) {
                     Text(
                         when {
-                            state.isSummarizing -> "Writing..."
-                            state.aiSummary != null -> "Regenerate"
-                            else -> "Generate summary"
+                            state.isSummarizing -> "Writing…"
+                            state.aiSummary != null -> "Write again"
+                            else -> "Write a summary"
                         }
                     )
                 }
@@ -266,7 +409,7 @@ private fun WeightCard(state: TrendsUiState, viewModel: TrendsViewModel) {
         modifier = Modifier.fillMaxWidth().background(KaloSurface, RoundedCornerShape(16.dp)).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("BODY WEIGHT", style = KaloTypography.labelSmall, color = KaloTextSecondary)
+        Text("Body weight", style = KaloTypography.titleMedium, color = KaloTextPrimary)
 
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
@@ -280,7 +423,7 @@ private fun WeightCard(state: TrendsUiState, viewModel: TrendsViewModel) {
             Button(onClick = { viewModel.logWeight() }, enabled = state.weightInput.isNotBlank()) { Text("Log") }
         }
         if (!state.weightError.isNullOrBlank()) {
-            Text(state.weightError ?: "", style = KaloTypography.bodyMedium, color = KaloFat)
+            Text(state.weightError ?: "", style = KaloTypography.bodyMedium, color = KaloError)
         }
 
         if (state.weights.size >= 2) {

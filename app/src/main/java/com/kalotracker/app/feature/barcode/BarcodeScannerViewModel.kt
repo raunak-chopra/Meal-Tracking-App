@@ -29,10 +29,13 @@ data class BarcodeUiState(
     val isManualInputVisible: Boolean = false,
     val manualBarcodeText: String = "",
     val labelConfirmed: Boolean = false,
-    val reviewLabelUrl: String? = null
+    val reviewLabelUrl: String? = null,
+    val amountInput: String? = null
 ) {
+    val amountText: String get() = amountInput ?: portionGrams.toString().removeSuffix(".0")
+    val hasValidPortion: Boolean get() = parseBarcodePortion(amountText)?.let { it == portionGrams } == true
     val canLog: Boolean get() = product != null && !isSaving && !isSaved && !isLookingUp &&
-        (product.requiresLabelConfirmation.not() || labelConfirmed)
+        hasValidPortion && (product.requiresLabelConfirmation.not() || labelConfirmed)
     val currentCalories: Int get() = product?.calculateCalories(portionGrams) ?: 0
     val currentProtein: Float get() = product?.calculateProtein(portionGrams) ?: 0f
     val currentCarbs: Float get() = product?.calculateCarbs(portionGrams) ?: 0f
@@ -74,7 +77,7 @@ class BarcodeScannerViewModel(
                     it.copy(
                         isLookingUp = false,
                         product = product,
-                        portionGrams = product.servingSizeGrams
+                        portionGrams = product.servingSizeGrams, amountInput = null
                     )
                 }
             }.onFailure { err ->
@@ -111,14 +114,21 @@ class BarcodeScannerViewModel(
         }
     }
     fun updatePortionGrams(grams: Float) {
-        if (!grams.isFinite()) return
-        _uiState.update { it.copy(portionGrams = grams.coerceIn(5f, 2500f)) }
+        if (!grams.isFinite() || _uiState.value.isSaving) return
+        _uiState.update { it.copy(portionGrams = grams.coerceIn(5f, 2500f), amountInput = null) }
+    }
+
+    fun updatePortionInput(text: String) {
+        if (_uiState.value.isSaving) return
+        val raw = text.take(32)
+        _uiState.update { it.copy(amountInput = raw, portionGrams = parseBarcodePortion(raw) ?: it.portionGrams) }
     }
 
     fun adjustPortion(multiplier: Float) {
+        if (!multiplier.isFinite() || multiplier <= 0f || _uiState.value.isSaving) return
         _uiState.update {
             val updated = (it.portionGrams * multiplier).coerceIn(5f, 2500f)
-            it.copy(portionGrams = updated)
+            it.copy(portionGrams = updated, amountInput = null)
         }
     }
 
@@ -152,7 +162,7 @@ class BarcodeScannerViewModel(
                 scannedBarcode = null,
                 product = null,
                 errorMessage = null,
-                isSaved = false, labelConfirmed = false, reviewLabelUrl = null
+                isSaved = false, labelConfirmed = false, reviewLabelUrl = null, amountInput = null
             )
         }
     }
@@ -164,7 +174,7 @@ class BarcodeScannerViewModel(
 
         saveOperation.launch(viewModelScope, onSuccess) {
             val mealId = UUID.randomUUID().toString()
-            val mealTitle = prod.name.ifBlank { "Scanned Food" }
+            val mealTitle = prod.name.ifBlank { "Scanned food" }
 
             val mealEntity = MealEntity(
                 id = mealId,
@@ -185,7 +195,8 @@ class BarcodeScannerViewModel(
                 protein = s.currentProtein,
                 carbs = s.currentCarbs,
                 fat = s.currentFat,
-                confidence = if (prod.fromCatalog) 0.7f else 1.0f
+                confidence = if (prod.fromCatalog) 0.7f else 1.0f,
+                unit = prod.unit
             )
 
             mealRepository.saveMeal(mealEntity, listOf(foodEntity))
@@ -194,6 +205,9 @@ class BarcodeScannerViewModel(
         }
     }
 }
+
+internal fun parseBarcodePortion(text: String): Float? =
+    text.toFloatOrNull()?.takeIf { it.isFinite() && it in 5f..2500f }
 
 class BarcodeScannerViewModelFactory(
     private val mealRepository: MealRepository,

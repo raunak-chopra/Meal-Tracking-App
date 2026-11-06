@@ -11,7 +11,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.kalotracker.app.core.ai.ActivityLevel
+import com.kalotracker.app.core.ai.BodyProfile
 import com.kalotracker.app.core.ai.GoalType
+import com.kalotracker.app.core.ai.Sex
+import com.kalotracker.app.core.ai.SuggestedTargets
+import com.kalotracker.app.core.ai.TargetCalculator
 import com.kalotracker.app.core.data.repository.MacroPreset
 import com.kalotracker.app.core.data.repository.UserProfile
 import com.kalotracker.app.core.data.repository.UserProfileRepository
@@ -34,6 +39,7 @@ data class SettingsUiState(
     val stepsInput: String = "10000",
     val waterInput: String = "2500",
     val apiKeyInput: String = "",
+    val backupKeyInput: String = "",
     val modelInput: String = AppSettings.DEFAULT_MODEL,
     val aiConfigured: Boolean = false,
     val isTestingAi: Boolean = false,
@@ -46,8 +52,29 @@ data class SettingsUiState(
     val dataOk: Boolean = false,
     val goalError: String? = null,
     val backupSchedule: com.kalotracker.app.core.settings.BackupSchedule = com.kalotracker.app.core.settings.BackupSchedule(),
-    val restorePreview: String? = null
+    val restorePreview: String? = null,
+    val body: BodyInputs = BodyInputs(),
+    val bodyError: String? = null,
+    val suggestion: SuggestedTargets? = null,
+    val targetsMessage: String? = null,
+    /** Share of calories from each macro, shown under the targets. */
+    val splitText: String? = null
 )
+
+/** Text the user is typing for the "About you" form. */
+data class BodyInputs(
+    val sex: Sex? = null,
+    val age: String = "",
+    val heightCm: String = "",
+    val weightKg: String = "",
+    val activity: ActivityLevel? = null
+) {
+    companion object {
+        fun from(b: BodyProfile?) = if (b == null) BodyInputs() else BodyInputs(b.sex, b.age.toString(),
+            trimNumber(b.heightCm), trimNumber(b.weightKg), b.activity)
+        private fun trimNumber(v: Float) = if (v % 1f == 0f) v.toInt().toString() else v.toString()
+    }
+}
 
 class SettingsViewModel(
     private val userProfileRepository: UserProfileRepository,
@@ -60,19 +87,34 @@ class SettingsViewModel(
     private val _uiState = MutableStateFlow(
         SettingsUiState(
             apiKeyInput = appSettings.ai.value.apiKey,
+            backupKeyInput = appSettings.ai.value.backupApiKey,
             modelInput = appSettings.ai.value.model,
             aiConfigured = appSettings.ai.value.isConfigured,
-            reminder = appSettings.reminder.value
+            reminder = appSettings.reminder.value,
+            body = BodyInputs.from(userProfileRepository.body.value)
         )
     )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     private var pendingRestore: com.kalotracker.app.core.data.backup.ArchiveContents? = null
     private var pendingJson: com.kalotracker.app.core.data.backup.BackupFile? = null
+
+    /** Last usable macro split, so typing a calorie target digit by digit never loses it. */
+    private var split: MacroSplit = MacroSplit(0.3f, 0.45f, 0.25f)
+    /** Targets last copied into the form, to tell a goal-only change from a target change. */
+    private var shownTargets: com.kalotracker.app.core.data.repository.UserProfile? = null
+
     init {
         viewModelScope.launch { appSettings.backup.collect { s -> _uiState.update { it.copy(backupSchedule = s) } } }
         viewModelScope.launch {
             userProfileRepository.profile.collect { profile ->
+                // A goal-only change must not wipe target numbers the user is still typing.
+                val previous = shownTargets
+                shownTargets = profile
+                if (previous != null && previous.copy(goal = profile.goal) == profile) {
+                    _uiState.update { it.copy(profile = profile, goal = profile.goal) }
+                    return@collect
+                }
                 _uiState.update {
                     it.copy(
                         profile = profile,
@@ -82,24 +124,81 @@ class SettingsViewModel(
                         fatInput = profile.targetFat.toString(),
                         stepsInput = profile.targetSteps.toString(),
                         waterInput = profile.targetWaterMl.toString(),
-                        goal = profile.goal
+                        goal = profile.goal,
+                        splitText = MacroSplit.of(profile.targetProtein, profile.targetCarbs, profile.targetFat)?.percentText()
                     )
                 }
+                split = MacroSplit.of(profile.targetProtein, profile.targetCarbs, profile.targetFat) ?: split
             }
         }
     }
 
-    fun updateCalorieInput(value: String) = _uiState.update { it.copy(calorieInput = value) }
-    fun updateProteinInput(value: String) = _uiState.update { it.copy(proteinInput = value) }
-    fun updateCarbsInput(value: String) = _uiState.update { it.copy(carbsInput = value) }
-    fun updateFatInput(value: String) = _uiState.update { it.copy(fatInput = value) }
+    /** A new calorie target rescales protein, carbs and fat, keeping the current split. */
+    fun updateCalorieInput(value: String) = _uiState.update { s ->
+        val calories = value.toIntOrNull()?.takeIf { it in 1..100_000 } ?: return@update s.copy(calorieInput = value)
+        val (p, c, f) = split.gramsFor(calories)
+        s.copy(calorieInput = value, proteinInput = p.toString(), carbsInput = c.toString(), fatInput = f.toString(), goalError = null)
+    }
+
+    fun updateProteinInput(value: String) = updateMacros { it.copy(proteinInput = value) }
+    fun updateCarbsInput(value: String) = updateMacros { it.copy(carbsInput = value) }
+    fun updateFatInput(value: String) = updateMacros { it.copy(fatInput = value) }
+
+    /** A macro change recalculates calories (4/4/9 kcal per gram) and the split. */
+    private fun updateMacros(edit: (SettingsUiState) -> SettingsUiState) = _uiState.update { old ->
+        val s = edit(old)
+        val p = s.proteinInput.toIntOrNull()
+        val c = s.carbsInput.toIntOrNull()
+        val f = s.fatInput.toIntOrNull()
+        if (p == null || c == null || f == null || p < 0 || c < 0 || f < 0) return@update s
+        MacroSplit.of(p, c, f)?.let { split = it }
+        s.copy(calorieInput = MacroSplit.caloriesOf(p, c, f).toString(),
+            splitText = MacroSplit.of(p, c, f)?.percentText(), goalError = null)
+    }
     fun updateStepsInput(value: String) = _uiState.update { it.copy(stepsInput = value) }
     fun updateWaterInput(value: String) = _uiState.update { it.copy(waterInput = value) }
     fun updateApiKeyInput(value: String) = _uiState.update { it.copy(apiKeyInput = value, aiTestMessage = null) }
+    fun updateBackupKeyInput(value: String) = _uiState.update { it.copy(backupKeyInput = value, aiTestMessage = null) }
     fun updateModelInput(value: String) = _uiState.update { it.copy(modelInput = value, aiTestMessage = null) }
 
     fun setGoal(goal: GoalType) {
         userProfileRepository.setGoal(goal)
+        if (_uiState.value.suggestion != null) calculateTargets()
+    }
+
+    fun updateBody(transform: (BodyInputs) -> BodyInputs) =
+        _uiState.update { it.copy(body = transform(it.body), bodyError = null, suggestion = null, targetsMessage = null) }
+
+    /** Saves the body details and shows suggested targets; nothing changes until the user applies them. */
+    fun calculateTargets() {
+        val b = _uiState.value.body
+        val age = b.age.trim().toIntOrNull()
+        val height = b.heightCm.trim().replace(',', '.').toFloatOrNull()
+        val weight = b.weightKg.trim().replace(',', '.').toFloatOrNull()
+        val error = when {
+            b.sex == null -> "Choose female or male. The formula needs it."
+            age == null -> "Enter your age in years."
+            height == null -> "Enter your height in cm."
+            weight == null -> "Enter your weight in kg."
+            b.activity == null -> "Choose how active you are."
+            else -> BodyProfile(b.sex, age, height, weight, b.activity).automaticTargetProblem()
+        }
+        if (error != null) {
+            _uiState.update { it.copy(bodyError = error, suggestion = null) }
+            return
+        }
+        val body = BodyProfile(b.sex!!, age!!, height!!, weight!!, b.activity!!)
+        userProfileRepository.saveBody(body)
+        val goal = userProfileRepository.profile.value.goal
+        _uiState.update { it.copy(bodyError = null, targetsMessage = null, suggestion = TargetCalculator.suggest(body, goal)) }
+    }
+
+    fun applySuggestion() {
+        val t = _uiState.value.suggestion ?: return
+        userProfileRepository.updateTargets(t.calories, t.protein, t.carbs, t.fat,
+            userProfileRepository.profile.value.targetSteps, t.waterMl)
+        _uiState.update { it.copy(suggestion = null, goalError = null,
+            targetsMessage = "Targets updated. Recheck after 2–3 weeks of weigh-ins.") }
     }
 
     fun setReminderEnabled(enabled: Boolean) = updateReminder(_uiState.value.reminder.copy(enabled = enabled))
@@ -139,20 +238,26 @@ class SettingsViewModel(
         return true
     }
 
-    /** Saves the key/model, then makes a tiny request so a wrong key or model is caught right away. */
+    /** Saves the keys/model, then checks each key on its own so a wrong key or model is caught right away. */
     fun saveAndTestAi() {
         val s = _uiState.value
-        val candidate = AiSettings(s.apiKeyInput.trim(), s.modelInput.trim().ifBlank { AppSettings.DEFAULT_MODEL })
-        appSettings.saveAi(candidate.apiKey, candidate.model)
+        val candidate = AiSettings(s.apiKeyInput.trim(), s.modelInput.trim().ifBlank { AppSettings.DEFAULT_MODEL }, s.backupKeyInput.trim())
+        appSettings.saveAi(candidate.apiKey, candidate.model, candidate.backupApiKey)
         _uiState.update { it.copy(isTestingAi = true, aiTestMessage = null, aiConfigured = candidate.isConfigured) }
         viewModelScope.launch {
-            val result = analysisService.testConnection(candidate)
+            val checks = listOf("Main key" to candidate.apiKey, "Backup key" to candidate.backupApiKey)
+                .filter { it.second.isNotBlank() }
+                .map { (label, key) -> label to analysisService.testConnection(AiSettings(key, candidate.model)) }
+            val allOk = checks.all { it.second.isSuccess }
             _uiState.update {
                 it.copy(
                     isTestingAi = false,
-                    aiTestOk = result.isSuccess,
-                    aiTestMessage = if (result.isSuccess) "Connected. Photo scanning is ready."
-                    else result.exceptionOrNull()?.localizedMessage ?: "Test failed"
+                    aiTestOk = allOk,
+                    aiTestMessage = if (allOk) {
+                        if (checks.size > 1) "Both keys work. Photo logging is ready." else "Connected. Photo logging is ready."
+                    } else checks.joinToString("\n") { (label, result) ->
+                        "$label: " + if (result.isSuccess) "works" else (result.exceptionOrNull()?.localizedMessage ?: "test failed")
+                    }
                 )
             }
         }
@@ -204,7 +309,7 @@ class SettingsViewModel(
         appSettings.saveBackup(appSettings.backup.value.folder, enabled)
         com.kalotracker.app.core.data.backup.BackupScheduler.schedule(context, enabled)
     }
-    fun exportArchive(uri: Uri, resolver: ContentResolver) = runData({ "Archive saved, including photos and library. API key excluded." }) {
+    fun exportArchive(uri: Uri, resolver: ContentResolver) = runData({ "Archive saved, including photos and library. API keys excluded." }) {
         val output = withContext(Dispatchers.IO) { resolver.openOutputStream(uri, "wt") } ?: throw java.io.IOException("Couldn't write archive.")
         backupManager.exportArchive(output)
     }
@@ -225,7 +330,7 @@ class SettingsViewModel(
                 }
             }
             val f = pendingRestore?.backup ?: pendingJson!!
-            _uiState.update { it.copy(restorePreview = "${f.meals.size} meals, ${f.workouts.size} workouts, ${f.water.size} water, ${f.weights.size} weights; ${f.savedFoods.size} foods/recipes, ${f.routines.size} routines, ${f.dayStatus.size} day statuses, ${f.goalHistory.size} goal dates, ${pendingRestore?.photos?.size ?: 0} photos.\nMerge by id; matching records are updated, other local records are kept. Goals and non-secret settings may be replaced. Your API key and backup folder stay.") }
+            _uiState.update { it.copy(restorePreview = "${f.meals.size} meals, ${f.workouts.size} workouts, ${f.water.size} water, ${f.weights.size} weights; ${f.savedFoods.size} foods/recipes, ${f.routines.size} routines, ${f.dayStatus.size} day statuses, ${f.goalHistory.size} goal dates, ${pendingRestore?.photos?.size ?: 0} photos.\nMerge by id; matching records are updated, other local records are kept. Goals and non-secret settings may be replaced. Your API keys and backup folder stay.") }
         }
     }
     fun cancelRestore() { pendingJson = null; pendingRestore = null; _uiState.update { it.copy(restorePreview = null) } }
@@ -247,8 +352,8 @@ class SettingsViewModel(
     }
 
     fun clearAiKey() {
-        appSettings.saveAi("", _uiState.value.modelInput)
-        _uiState.update { it.copy(apiKeyInput = "", aiConfigured = false, aiTestMessage = null) }
+        appSettings.saveAi("", _uiState.value.modelInput, "")
+        _uiState.update { it.copy(apiKeyInput = "", backupKeyInput = "", aiConfigured = false, aiTestMessage = null) }
     }
 }
 

@@ -1,2 +1,2 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources><color name="kalo_background">#151916</color><color name="kalo_surface">#202621</color><color name="kalo_accent_protein">#A1C3D9</color><color name="kalo_accent_carbs">#C7D39B</color><color name="kalo_accent_fat">#E6ADBA</color><color name="kalo_accent_steps">#C7D39B</color></resources>
+<resources><color name="bowlful_background">#1A1512</color><color name="bowlful_surface">#251E19</color><color name="bowlful_accent_protein">#8FD0A8</color><color name="bowlful_accent_carbs">#F0A58A</color><color name="bowlful_accent_fat">#D9A6D6</color><color name="bowlful_accent_steps">#8FD0A8</color></resources>

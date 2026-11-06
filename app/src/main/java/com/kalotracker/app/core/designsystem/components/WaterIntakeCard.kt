@@ -1,193 +1,157 @@
 package com.kalotracker.app.core.designsystem.components
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.*
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.kalotracker.app.core.designsystem.*
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun WaterIntakeCard(
     currentWaterMl: Int,
     targetWaterMl: Int = 2500,
     onAddWater: (Int) -> Unit,
     onUndoWater: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onEditTarget: (() -> Unit)? = null,
+    entryDate: String = ""
 ) {
-    val progress = if (targetWaterMl > 0) {
-        (currentWaterMl.toFloat() / targetWaterMl).coerceIn(0f, 1f)
-    } else 0f
-
-    val percent = (progress * 100).toInt()
-
-    Box(
-        modifier = modifier
+    val haptics = LocalHapticFeedback.current
+    var custom by rememberSaveable(entryDate) { mutableStateOf(false) }
+    var amount by rememberSaveable(entryDate) { mutableStateOf("") }
+    val valid = amount.toIntOrNull()?.takeIf { it > 0 && currentWaterMl.toLong() + it <= Int.MAX_VALUE.toLong() }
+    val animatedWater by animateIntAsState(
+        targetValue = currentWaterMl,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "waterMl"
+    )
+    val targetFraction = if (targetWaterMl > 0) (currentWaterMl.toFloat() / targetWaterMl).coerceIn(0f, 1f) else 0f
+    val animatedFraction by animateFloatAsState(
+        targetValue = targetFraction,
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "waterProgress"
+    )
+    if (custom) AlertDialog(
+        onDismissRequest = { custom = false },
+        title = { Text("Add water") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Amount in milliliters for this day")
+                OutlinedTextField(
+                    value = amount,
+                    onValueChange = { amount = it },
+                    label = { Text("Amount (ml)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    isError = amount.isNotEmpty() && valid == null
+                )
+                if (amount.isNotEmpty() && valid == null) {
+                    Text(
+                        "Enter a positive whole amount in ml. This amount may be too large.",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = valid != null,
+                onClick = {
+                    valid?.let {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onAddWater(it)
+                    }
+                    custom = false
+                    amount = ""
+                }
+            ) { Text("Add water") }
+        },
+        dismissButton = { TextButton(onClick = { custom = false }) { Text("Cancel") } }
+    )
+    Column(
+        modifier
             .fillMaxWidth()
             .background(KaloSurface, RoundedCornerShape(20.dp))
-            .padding(20.dp)
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Column {
-            // Header: Category Tag & Target Percent
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(KaloWater)
-                    )
-                    Text(
-                        text = "HYDRATION",
-                        style = KaloTypography.labelSmall,
-                        color = KaloWater
-                    )
-                }
-
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Water", style = KaloTypography.titleMedium, color = KaloTextPrimary, modifier = Modifier.semantics { heading() })
+            if (targetWaterMl > 0) {
                 Text(
-                    text = if(targetWaterMl > 0) "$percent% of goal" else "Target unavailable",
-                    style = KaloTypography.bodyMedium,
-                    color = if (percent >= 100) KaloWater else KaloTextMuted
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Current Volume / Goal
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text(
-                        text = "%,d ml".format(currentWaterMl),
-                        style = KaloTypography.displayMedium,
-                        color = KaloTextPrimary
-                    )
-                    Text(
-                        text = if(targetWaterMl > 0) "of %,d ml target".format(targetWaterMl) else "No goal recorded for this day",
-                        style = KaloTypography.bodyMedium,
-                        color = KaloTextSecondary
-                    )
-                }
-
-                if (currentWaterMl > 0) {
-                    // Quick Undo Button
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(KaloSurfaceElevated)
-                            .clickable(onClick = onUndoWater)
-                            .heightIn(min = 48.dp)
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Undo last water entry",
-                            tint = KaloTextMuted,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Text(
-                            text = "Undo",
-                            style = KaloTypography.labelSmall,
-                            color = KaloTextMuted
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Progress Bar
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(3.dp)),
-                color = KaloWater,
-                trackColor = KaloSurfaceElevated,
-                strokeCap = StrokeCap.Round
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Quick-add Increment Pills
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                WaterPill(
-                    label = "+250 ml",
-                    subLabel = "Glass",
-                    onClick = { onAddWater(250) },
-                    modifier = Modifier.weight(1f)
-                )
-                WaterPill(
-                    label = "+500 ml",
-                    subLabel = "Bottle",
-                    onClick = { onAddWater(500) },
-                    modifier = Modifier.weight(1f)
-                )
-                WaterPill(
-                    label = "+750 ml",
-                    subLabel = "Large",
-                    onClick = { onAddWater(750) },
-                    modifier = Modifier.weight(1f)
+                    "${(currentWaterMl.toLong() * 100 / targetWaterMl)}%",
+                    style = KaloTypography.labelMedium.copy(fontFeatureSettings = TabularFontFeature),
+                    color = KaloWater
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun WaterPill(
-    label: String,
-    subLabel: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(KaloSurfaceElevated)
-            .clickable(onClick = onClick)
-            .padding(vertical = 10.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = label,
-                style = KaloTypography.titleMedium,
-                color = KaloTextPrimary
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = subLabel,
-                style = KaloTypography.labelSmall,
-                color = KaloWater
-            )
+        Text(
+            if (targetWaterMl > 0) "%,d ml / %,d ml target".format(animatedWater, targetWaterMl)
+            else "%,d ml · target unavailable".format(animatedWater),
+            style = KaloTypography.headlineSmall.copy(fontFeatureSettings = TabularFontFeature),
+            color = KaloTextPrimary
+        )
+        if (targetWaterMl > 0) LinearProgressIndicator(
+            progress = { animatedFraction },
+            modifier = Modifier.fillMaxWidth().height(6.dp).semantics { contentDescription = "Water toward your target" },
+            color = KaloWater,
+            trackColor = KaloDivider,
+            strokeCap = StrokeCap.Round
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(250, 500, 750).forEach { ml ->
+                FilledTonalButton(
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onAddWater(ml)
+                    },
+                    modifier = Modifier.heightIn(min = 48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = KaloSurfaceElevated,
+                        contentColor = KaloTextPrimary
+                    )
+                ) { Text("+$ml ml", style = KaloTypography.labelMedium.copy(fontFeatureSettings = TabularFontFeature)) }
+            }
+            OutlinedButton(
+                onClick = { custom = true },
+                modifier = Modifier.heightIn(min = 48.dp),
+                shape = RoundedCornerShape(14.dp)
+            ) { Text("Custom") }
+        }
+        if (currentWaterMl > 0 || onEditTarget != null) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (currentWaterMl > 0) TextButton(
+                    onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onUndoWater()
+                    },
+                    modifier = Modifier.heightIn(min = 40.dp)
+                ) { Text("Undo last entry") }
+                onEditTarget?.let {
+                    TextButton(onClick = it, modifier = Modifier.heightIn(min = 40.dp)) { Text("Edit target") }
+                }
+            }
         }
     }
 }

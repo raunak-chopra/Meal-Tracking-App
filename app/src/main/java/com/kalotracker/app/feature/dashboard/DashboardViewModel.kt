@@ -32,6 +32,9 @@ data class DashboardUiState(
     val selectedDate: LocalDate = LocalDate.now(),
     val isToday: Boolean = true,
     val dayComplete: Boolean = false,
+    /** True until height, weight, age and activity are filled in Settings. */
+    val needsBodyDetails: Boolean = false,
+    val bodyWeightKg: Double = 70.0,
     val targetCalories: Int = 2200,
     val currentCalories: Int = 0,
     val targetProtein: Int = 160,
@@ -46,10 +49,13 @@ data class DashboardUiState(
     val healthData: HealthDataSummary = HealthDataSummary(),
     val todayMeals: List<MealWithItems> = emptyList(),
     val todayWorkouts: List<WorkoutWithSets> = emptyList(),
+    val lastWorkout: WorkoutWithSets? = null,
+    val routines: List<com.kalotracker.app.core.database.entity.WorkoutRoutineEntity> = emptyList(),
     val dailyInsight: NutritionInsight? = null,
     val pendingUndo: UndoAction? = null,
     val isLoading: Boolean = false,
     val isRepeatingMeal: Boolean = false,
+    val isLoggingWorkout: Boolean = false,
     val repeatMessage: String? = null
 )
 
@@ -66,6 +72,9 @@ class DashboardViewModel(
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
     private val repeatSave = SaveOperation { status ->
         _uiState.update { it.copy(isRepeatingMeal = status.busy, repeatMessage = status.error) }
+    }
+    private val workoutQuickSave = SaveOperation { status ->
+        _uiState.update { it.copy(isLoggingWorkout = status.busy, repeatMessage = status.error) }
     }
 
     private var dayStatuses = emptyList<com.kalotracker.app.core.database.entity.DayStatusEntity>()
@@ -90,6 +99,17 @@ class DashboardViewModel(
             }
         }
 
+        viewModelScope.launch {
+            userProfileRepository.body.collect { b ->
+                val wt = b?.weightKg?.toDouble()?.takeIf { it in 20.0..300.0 } ?: 70.0
+                _uiState.update { it.copy(needsBodyDetails = b == null, bodyWeightKg = wt) }
+            }
+        }
+        viewModelScope.launch {
+            personalDao.observeRoutines().collect { list ->
+                _uiState.update { it.copy(routines = list) }
+            }
+        }
         viewModelScope.launch { userProfileRepository.history.collect { applyTargets(); recomputeInsight() } }
         loadDataForDate(LocalDate.now())
     }
@@ -99,8 +119,10 @@ class DashboardViewModel(
         loadDataForDate(prev)
     }
 
+    /** Days ahead of today hold no records yet, so the day picker stops at today. */
     fun goToNextDay() {
         val next = _uiState.value.selectedDate.plusDays(1)
+        if (next.isAfter(LocalDate.now())) return
         loadDataForDate(next)
     }
 
@@ -108,7 +130,8 @@ class DashboardViewModel(
         loadDataForDate(LocalDate.now())
     }
 
-    fun loadDataForDate(date: LocalDate) {
+    fun loadDataForDate(requested: LocalDate) {
+        val date = minOf(requested, LocalDate.now())
         val isToday = date.isEqual(LocalDate.now())
         _uiState.update {
             it.copy(
@@ -128,9 +151,9 @@ class DashboardViewModel(
         mealsJob = viewModelScope.launch {
             mealRepository.getMealsForDay(startOfDay, endOfDay).collect { meals ->
                 val totalCal = meals.sumOf { it.meal.totalCalories }
-                val totalProtein = meals.sumOf { it.meal.totalProteinGrams.toDouble() }.toInt()
-                val totalCarbs = meals.sumOf { it.meal.totalCarbsGrams.toDouble() }.toInt()
-                val totalFat = meals.sumOf { it.meal.totalFatGrams.toDouble() }.toInt()
+                val totalProtein = kotlin.math.round(meals.sumOf { it.meal.totalProteinGrams.toDouble() }).toInt()
+                val totalCarbs = kotlin.math.round(meals.sumOf { it.meal.totalCarbsGrams.toDouble() }).toInt()
+                val totalFat = kotlin.math.round(meals.sumOf { it.meal.totalFatGrams.toDouble() }).toInt()
 
                 _uiState.update {
                     it.copy(
@@ -148,7 +171,9 @@ class DashboardViewModel(
         workoutsJob?.cancel()
         workoutsJob = viewModelScope.launch {
             workoutRepository.getWorkoutsForDay(startOfDay, endOfDay).collect { workouts ->
-                _uiState.update { it.copy(todayWorkouts = workouts) }
+                val recent = runCatching { workoutRepository.getRecentWorkouts(5) }.getOrDefault(emptyList())
+                val latest = workouts.firstOrNull() ?: recent.firstOrNull()
+                _uiState.update { it.copy(todayWorkouts = workouts, lastWorkout = latest) }
                 recomputeInsight()
             }
         }
@@ -182,6 +207,7 @@ class DashboardViewModel(
     fun refreshHealthData(date: LocalDate = _uiState.value.selectedDate) {
         val request = ++healthRequest
         healthJob?.cancel()
+        _uiState.update { it.copy(healthData = HealthDataSummary()) }
         healthJob = viewModelScope.launch {
             val healthSummary = healthConnectManager.readHealthDataForDate(date)
             if (request != healthRequest || date != _uiState.value.selectedDate) return@launch
@@ -191,38 +217,63 @@ class DashboardViewModel(
     }
 
     fun logWater(milliliters: Int) {
+        if (milliliters <= 0) return
+        val day = _uiState.value
         viewModelScope.launch {
             val zoneId = ZoneId.systemDefault()
-            val timestamp = if (_uiState.value.isToday) {
+            val timestamp = if (day.isToday) {
                 System.currentTimeMillis()
             } else {
-                _uiState.value.selectedDate.atTime(12, 0).atZone(zoneId).toInstant().toEpochMilli()
+                day.selectedDate.atTime(12, 0).atZone(zoneId).toInstant().toEpochMilli()
             }
-            waterRepository.logWater(milliliters, timestamp)
+            try {
+                waterRepository.logWater(milliliters, timestamp)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) { _uiState.update { it.copy(repeatMessage = "Could not save water. Check the amount and try again.") } }
         }
     }
 
     fun undoLastWaterLog() {
+        val date = _uiState.value.selectedDate
         viewModelScope.launch {
             val zoneId = ZoneId.systemDefault()
-            val startOfDay = _uiState.value.selectedDate.atStartOfDay(zoneId).toInstant().toEpochMilli()
-            val endOfDay = _uiState.value.selectedDate.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli() - 1
-            waterRepository.undoLastWaterLog(startOfDay, endOfDay)
+            val startOfDay = date.atStartOfDay(zoneId).toInstant().toEpochMilli()
+            val endOfDay = date.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli() - 1
+            try {
+                waterRepository.undoLastWaterLog(startOfDay, endOfDay)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) { _uiState.update { it.copy(repeatMessage = "Could not undo water. Try again.") } }
         }
     }
 
     fun deleteMeal(mealWithItems: MealWithItems) {
         viewModelScope.launch {
-            mealRepository.deleteMeal(mealWithItems.meal)
-            _uiState.update { it.copy(pendingUndo = UndoAction.Meal(mealWithItems)) }
+            _uiState.value.pendingUndo?.let { finishUndoWindow(it) }
+            try {
+                mealRepository.deleteMeal(mealWithItems.meal)
+                _uiState.update { it.copy(pendingUndo = UndoAction.Meal(mealWithItems)) }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) { _uiState.update { it.copy(repeatMessage = "Could not delete that meal. Try again.") } }
         }
     }
 
     fun deleteWorkout(workoutWithSets: WorkoutWithSets) {
         viewModelScope.launch {
-            workoutRepository.deleteWorkout(workoutWithSets.workout)
-            _uiState.update { it.copy(pendingUndo = UndoAction.Workout(workoutWithSets)) }
+            _uiState.value.pendingUndo?.let { finishUndoWindow(it) }
+            try {
+                workoutRepository.deleteWorkout(workoutWithSets.workout)
+                _uiState.update { it.copy(pendingUndo = UndoAction.Workout(workoutWithSets)) }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) { _uiState.update { it.copy(repeatMessage = "Could not delete that workout. Try again.") } }
         }
+    }
+
+    /** Once undo is no longer possible, a deleted meal's photo is removed from the phone too. */
+    private suspend fun finishUndoWindow(action: UndoAction) {
+        if (action !is UndoAction.Meal) return
+        val path = action.item.meal.imageLocalUri ?: return
+        if (mealRepository.getMeal(action.item.meal.id) != null) return
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { java.io.File(path).delete() } }
     }
 
     fun undoDelete() {
@@ -237,7 +288,9 @@ class DashboardViewModel(
     }
 
     fun dismissUndo() {
+        val action = _uiState.value.pendingUndo ?: return
         _uiState.update { it.copy(pendingUndo = null) }
+        viewModelScope.launch { runCatching { finishUndoWindow(action) } }
     }
 
     /** Logs a copy of a meal on the day being viewed (now if today, otherwise noon of that day). */
@@ -252,6 +305,179 @@ class DashboardViewModel(
                 s.selectedDate.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
             }
             mealRepository.duplicateMeal(source, timestamp)
+        }
+    }
+
+    fun logWorkoutAgain(source: WorkoutWithSets) {
+        val s = _uiState.value
+        workoutQuickSave.launch(viewModelScope, { _uiState.update { it.copy(repeatMessage = "Workout logged.") } }) {
+            val timestamp = if (s.isToday) {
+                System.currentTimeMillis()
+            } else {
+                s.selectedDate.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            }
+            workoutRepository.duplicateWorkout(source, timestamp)
+        }
+    }
+
+    /**
+     * Toggles a single bodyweight exercise ("Push-ups", "Sit-ups", "Crunches") inside the selected day's
+     * "Daily fitness" session so tapping chips updates one clean workout entry rather than creating duplicates.
+     */
+    fun toggleDailyHabitExercise(exerciseName: String, defaultReps: Int = 20, totalMinutes: Int = 7) {
+        val s = _uiState.value
+        val safeReps = defaultReps.coerceIn(1, 10000)
+        val safeMins = totalMinutes.coerceIn(3, 60)
+        val weight = s.bodyWeightKg.coerceIn(20.0, 300.0)
+        workoutQuickSave.launch(viewModelScope, {}) {
+            val existing = s.todayWorkouts.firstOrNull { it.workout.title.equals("Daily fitness", ignoreCase = true) }
+            val habitOrder = listOf("Push-ups", "Sit-ups", "Crunches")
+            val currentReps = mutableMapOf<String, Int>()
+            if (existing != null) {
+                existing.sets.filter { it.isCompleted && it.exerciseName in habitOrder }.forEach { set ->
+                    currentReps[set.exerciseName] = (currentReps[set.exerciseName] ?: 0) + set.reps
+                }
+            }
+            val wasChecked = (currentReps[exerciseName] ?: 0) > 0
+            if (wasChecked) {
+                currentReps.remove(exerciseName)
+            } else {
+                currentReps[exerciseName] = safeReps
+            }
+            val repsList = habitOrder.map { currentReps[it] ?: 0 }
+            if (repsList.all { it == 0 }) {
+                if (existing != null) {
+                    workoutRepository.deleteWorkout(existing.workout)
+                }
+                return@launch
+            }
+            val rows = com.kalotracker.app.feature.workout.dailyFitnessExercises(
+                minutes = safeMins,
+                weightKg = weight,
+                effort = com.kalotracker.app.feature.workout.FitnessEffort.MODERATE,
+                reps = repsList
+            )
+            val workoutId = existing?.workout?.id ?: java.util.UUID.randomUUID().toString()
+            val timestamp = existing?.workout?.timestamp ?: if (s.isToday) {
+                System.currentTimeMillis()
+            } else {
+                s.selectedDate.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            }
+            val entity = com.kalotracker.app.core.database.entity.WorkoutEntity(
+                id = workoutId,
+                title = "Daily fitness",
+                type = "STRENGTH",
+                durationMinutes = rows.sumOf { it.durationMinutes },
+                estimatedCaloriesBurned = rows.sumOf { it.calories },
+                timestamp = timestamp,
+                exercisesJson = com.kalotracker.app.core.data.food.PersonalFood.json.encodeToString(
+                    kotlinx.serialization.builtins.ListSerializer(com.kalotracker.app.feature.workout.WorkoutExercise.serializer()),
+                    rows
+                )
+            )
+            val setEntities = rows.flatMap { row ->
+                row.sets.map { set ->
+                    com.kalotracker.app.core.database.entity.ExerciseSetEntity(
+                        workoutId = workoutId,
+                        exerciseName = row.name,
+                        setNumber = set.setNumber,
+                        weightKg = set.weightKg.toFloatOrNull() ?: 0f,
+                        reps = set.reps.toIntOrNull() ?: safeReps,
+                        isCompleted = true
+                    )
+                }
+            }
+            if (existing == null) {
+                workoutRepository.saveWorkout(entity, setEntities)
+            } else {
+                workoutRepository.updateWorkout(entity, setEntities)
+            }
+        }
+    }
+
+    fun quickLogDailyFitness(minutes: Int = 7, reps: List<Int> = listOf(20, 20, 20)) {
+        val s = _uiState.value
+        val safeMins = minutes.coerceIn(3, 60)
+        val weight = s.bodyWeightKg.coerceIn(20.0, 300.0)
+        val cleanReps = if (reps.size == 3 && reps.any { it > 0 }) reps else listOf(20, 20, 20)
+        workoutQuickSave.launch(viewModelScope, { _uiState.update { it.copy(repeatMessage = "Daily fitness logged.") } }) {
+            val existing = s.todayWorkouts.firstOrNull { it.workout.title.equals("Daily fitness", ignoreCase = true) }
+            val rows = com.kalotracker.app.feature.workout.dailyFitnessExercises(
+                minutes = safeMins,
+                weightKg = weight,
+                effort = com.kalotracker.app.feature.workout.FitnessEffort.MODERATE,
+                reps = cleanReps
+            )
+            val workoutId = existing?.workout?.id ?: java.util.UUID.randomUUID().toString()
+            val timestamp = existing?.workout?.timestamp ?: if (s.isToday) {
+                System.currentTimeMillis()
+            } else {
+                s.selectedDate.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            }
+            val entity = com.kalotracker.app.core.database.entity.WorkoutEntity(
+                id = workoutId,
+                title = "Daily fitness",
+                type = "STRENGTH",
+                durationMinutes = rows.sumOf { it.durationMinutes },
+                estimatedCaloriesBurned = rows.sumOf { it.calories },
+                timestamp = timestamp,
+                exercisesJson = com.kalotracker.app.core.data.food.PersonalFood.json.encodeToString(
+                    kotlinx.serialization.builtins.ListSerializer(com.kalotracker.app.feature.workout.WorkoutExercise.serializer()),
+                    rows
+                )
+            )
+            val setEntities = rows.flatMap { row ->
+                row.sets.map { set ->
+                    com.kalotracker.app.core.database.entity.ExerciseSetEntity(
+                        workoutId = workoutId,
+                        exerciseName = row.name,
+                        setNumber = set.setNumber,
+                        weightKg = set.weightKg.toFloatOrNull() ?: 0f,
+                        reps = set.reps.toIntOrNull() ?: 20,
+                        isCompleted = true
+                    )
+                }
+            }
+            if (existing == null) {
+                workoutRepository.saveWorkout(entity, setEntities)
+            } else {
+                workoutRepository.updateWorkout(entity, setEntities)
+            }
+        }
+    }
+
+    fun quickLogRoutine(routine: com.kalotracker.app.core.database.entity.WorkoutRoutineEntity) {
+        val s = _uiState.value
+        workoutQuickSave.launch(viewModelScope, { _uiState.update { it.copy(repeatMessage = "Logged \"${routine.name}\".") } }) {
+            val rows = com.kalotracker.app.feature.workout.validateRoutinePayload(routine.payload)
+            val workoutId = java.util.UUID.randomUUID().toString()
+            val timestamp = if (s.isToday) {
+                System.currentTimeMillis()
+            } else {
+                s.selectedDate.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            }
+            val entity = com.kalotracker.app.core.database.entity.WorkoutEntity(
+                id = workoutId,
+                title = routine.name,
+                type = if (rows.all { it.cardio }) "CARDIO" else "STRENGTH",
+                durationMinutes = rows.sumOf { it.durationMinutes },
+                estimatedCaloriesBurned = rows.sumOf { it.calories },
+                timestamp = timestamp,
+                exercisesJson = routine.payload
+            )
+            val setEntities = rows.flatMap { row ->
+                row.sets.map { set ->
+                    com.kalotracker.app.core.database.entity.ExerciseSetEntity(
+                        workoutId = workoutId,
+                        exerciseName = row.name,
+                        setNumber = set.setNumber,
+                        weightKg = set.weightKg.toFloatOrNull() ?: 0f,
+                        reps = set.reps.toIntOrNull() ?: 1,
+                        isCompleted = true
+                    )
+                }
+            }
+            workoutRepository.saveWorkout(entity, setEntities)
         }
     }
 
@@ -272,14 +498,9 @@ class DashboardViewModel(
             consumedCalories = s.currentCalories,
             targetProtein = s.targetProtein,
             consumedProtein = s.proteinGrams,
-            targetCarbs = s.targetCarbs,
-            consumedCarbs = s.carbsGrams,
-            targetFat = s.targetFat,
-            consumedFat = s.fatGrams,
-            workoutCount = s.todayWorkouts.size,
-            activeBurn = s.healthData.activeCaloriesBurned,
             targetWaterMl = s.targetWaterMl,
-            consumedWaterMl = s.currentWaterMl
+            consumedWaterMl = s.currentWaterMl,
+            isToday = s.isToday
         )
         _uiState.update { it.copy(dailyInsight = insight) }
     }

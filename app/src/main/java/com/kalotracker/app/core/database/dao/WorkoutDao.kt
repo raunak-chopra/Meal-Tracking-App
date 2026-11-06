@@ -25,6 +25,10 @@ interface WorkoutDao {
     suspend fun getWorkoutsBetween(start: Long, end: Long): List<WorkoutWithSets>
 
     @Transaction
+    @Query("SELECT * FROM workouts ORDER BY timestamp DESC LIMIT :limit")
+    suspend fun getRecentWorkouts(limit: Int): List<WorkoutWithSets>
+
+    @Transaction
     @Query("SELECT * FROM workouts ORDER BY timestamp ASC")
     suspend fun getAllWorkouts(): List<WorkoutWithSets>
 

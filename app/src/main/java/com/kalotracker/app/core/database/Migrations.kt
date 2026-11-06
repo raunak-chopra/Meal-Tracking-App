@@ -4,7 +4,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 object Migrations {
-    val ALL: Array<Migration> get() = arrayOf(MIGRATION_2_3, MIGRATION_3_4)
+    val ALL: Array<Migration> get() = arrayOf(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
 
     /**
      * v2 -> v3: drops the unused cloud-sync columns (meals.imageRemoteUrl, meals.syncStatus,
@@ -59,5 +59,13 @@ object Migrations {
         "CREATE TABLE IF NOT EXISTS `saved_foods` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `kind` TEXT NOT NULL, `yieldGrams` REAL NOT NULL, `calories` INTEGER NOT NULL, `protein` REAL NOT NULL, `carbs` REAL NOT NULL, `fat` REAL NOT NULL, `favorite` INTEGER NOT NULL, `ingredientsJson` TEXT NOT NULL, PRIMARY KEY(`id`))",
         "CREATE TABLE IF NOT EXISTS `barcode_cache` (`barcode` TEXT NOT NULL, `payload` TEXT NOT NULL, `cachedAt` INTEGER NOT NULL, PRIMARY KEY(`barcode`))",
         "CREATE TABLE IF NOT EXISTS `workout_routines` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `payload` TEXT NOT NULL, PRIMARY KEY(`id`))"
+    )
+
+    /** v4 -> v5: food items remember whether their amount is grams or millilitres. */
+    val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) { MIGRATION_4_5_SQL.forEach { db.execSQL(it) } }
+    }
+    internal val MIGRATION_4_5_SQL = listOf(
+        "ALTER TABLE `food_items` ADD COLUMN `unit` TEXT NOT NULL DEFAULT 'g'"
     )
 }

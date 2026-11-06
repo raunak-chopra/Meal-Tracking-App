@@ -10,7 +10,7 @@ data class FoodCatalogItem(
     val carbsPer100g: Float,
     val fatPer100g: Float
 ) {
-    fun calculateCalories(grams: Float): Int = ((caloriesPer100g * grams) / 100f).toInt()
+    fun calculateCalories(grams: Float): Int = kotlin.math.round((caloriesPer100g * grams) / 100f).toInt()
     fun calculateProtein(grams: Float): Float = (proteinPer100g * grams) / 100f
     fun calculateCarbs(grams: Float): Float = (carbsPer100g * grams) / 100f
     fun calculateFat(grams: Float): Float = (fatPer100g * grams) / 100f
@@ -124,9 +124,8 @@ object FoodCatalog {
 
     fun search(query: String): List<FoodCatalogItem> {
         if (query.isBlank()) return commonFoods
-        val lower = query.trim().lowercase()
         return commonFoods.filter {
-            it.name.lowercase().contains(lower) || it.category.lowercase().contains(lower)
+            com.kalotracker.app.core.util.SearchText.matches(query, listOf(it.name, it.category))
         }
     }
 }

@@ -52,7 +52,7 @@ fun HealthPermissionsScreen(
                 }
 
                 Text(
-                    text = "HEALTH CONNECT",
+                    text = "Health Connect",
                     style = KaloTypography.labelSmall,
                     color = KaloTextSecondary
                 )
@@ -102,7 +102,7 @@ fun HealthPermissionsScreen(
             )
 
             Text(
-                text = "Kalo connects to Android Health Connect to read daily steps and active calorie expenditure directly from Samsung Health, Google Fit, Garmin, or your smartwatch.",
+                text = "Bowlful connects to Android Health Connect to read daily steps and active calorie expenditure directly from Samsung Health, Google Fit, Garmin, or your smartwatch.",
                 style = KaloTypography.bodyLarge,
                 color = KaloTextSecondary
             )

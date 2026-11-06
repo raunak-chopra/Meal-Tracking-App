@@ -8,6 +8,30 @@ import org.junit.Test
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class ManualMealViewModelTest {
+    @Test fun missingKeyIsCaughtBeforeRequestAndConfigurationCanBeRefreshed() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            var settings = com.kalotracker.app.core.settings.AiSettings()
+            var requests = 0
+            val service = object : com.kalotracker.app.core.network.MealAnalysisService({ settings }) {
+                override suspend fun analyzeMealText(description: String): Result<com.kalotracker.app.core.network.MealAnalysisResponse> {
+                    requests++
+                    return Result.success(com.kalotracker.app.core.network.MealAnalysisResponse())
+                }
+            }
+            val vm = ManualMealViewModel(service)
+            assertFalse(vm.canEstimate)
+            vm.estimate("Fixture lunch"); runCurrent()
+            assertEquals(0, requests)
+            assertFalse(vm.estimating.value)
+            assertNotNull(vm.estimateError.value)
+            settings = com.kalotracker.app.core.settings.AiSettings("fixture-key")
+            assertTrue(vm.canEstimate)
+            vm.estimate("Fixture lunch"); runCurrent()
+            assertEquals(1, requests)
+        } finally { Dispatchers.resetMain() }
+    }
+
     @Test fun completionIsRetainedForRecreatedScreenAndRepeatedTapsWriteOnce() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {

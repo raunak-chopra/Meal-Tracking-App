@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
+internal const val RECENT_MEAL_SEARCH_LIMIT = 200
+
 class MealRepository(
     private val mealDao: MealDao,
     private val dispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.IO
@@ -50,6 +52,11 @@ class MealRepository(
         mealDao.getRecentMeals(200)
             .distinctBy { it.meal.title.trim().lowercase() }
             .take(limit)
+    }
+
+    /** Search candidates must reach the picker before title deduplication or display limits. */
+    suspend fun getRecentMealsForSearch(): List<MealWithItems> = withContext(dispatcher) {
+        mealDao.getRecentMeals(RECENT_MEAL_SEARCH_LIMIT)
     }
 
     /** Logs a copy of an existing meal at [timestamp] (default: now). Photo is not copied. */

@@ -32,6 +32,15 @@ interface WaterDao {
     @Query("DELETE FROM water_logs")
     suspend fun deleteAll()
 
+    @androidx.room.Transaction
+    suspend fun insertWaterLogChecked(waterLog: WaterLogEntity, start: Long, end: Long) {
+        val total = getWaterLogsBetween(start, end).sumOf { it.milliliters.toLong() }
+        require(waterLog.milliliters > 0 && total + waterLog.milliliters <= Int.MAX_VALUE.toLong()) {
+            "Water amount exceeds storage capacity."
+        }
+        insertWaterLog(waterLog)
+    }
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWaterLog(waterLog: WaterLogEntity)
 

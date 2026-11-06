@@ -37,6 +37,8 @@ data class TrendsUiState(
     val weights: List<WeightLogEntity> = emptyList(), // newest first
     val weightInput: String = "",
     val weightError: String? = null,
+    val completionSavingDate: LocalDate? = null,
+    val completionError: String? = null,
     val goalSuggestion: GoalSuggestion? = null,
     val aiConfigured: Boolean = false,
     val isSummarizing: Boolean = false,
@@ -70,6 +72,7 @@ class TrendsViewModel(
     init {
         viewModelScope.launch { personalDao.observeDays().collect { refresh() } }
         viewModelScope.launch { userProfileRepository.history.collect { refresh() } }
+        viewModelScope.launch { userProfileRepository.body.collect { recomputeGoalSuggestion() } }
         viewModelScope.launch { mealRepository.getMealsForDay(0, Long.MAX_VALUE).collect { refresh() } }
         viewModelScope.launch { waterRepository.getWaterLogsForDay(0, Long.MAX_VALUE).collect { refresh() } }
         viewModelScope.launch { workoutRepository.getWorkoutsForDay(0, Long.MAX_VALUE).collect { refresh() } }
@@ -99,6 +102,28 @@ class TrendsViewModel(
         refresh()
     }
 
+    /** The user's explicit confirmation, never inferred from calories or meal count. */
+    fun setDayComplete(date: LocalDate, complete: Boolean) {
+        val state = _uiState.value
+        if (state.completionSavingDate != null || date >= LocalDate.now()) return
+        val day = state.stats?.days?.firstOrNull { it.date == date } ?: return
+        if ((!day.isLogged && complete) || day.complete == complete) return
+        _uiState.update { it.copy(completionSavingDate = date, completionError = null) }
+        viewModelScope.launch {
+            try {
+                personalDao.putDays(listOf(com.kalotracker.app.core.database.entity.DayStatusEntity(date.toString(), complete)))
+                // Share cancellation with range/profile/database refreshes; an old range must not win.
+                refresh()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                _uiState.update { it.copy(completionError = "Could not update this day. Try again.") }
+            } finally {
+                _uiState.update { it.copy(completionSavingDate = null) }
+            }
+        }
+    }
+
     private suspend fun loadRange() {
         val state = _uiState.value
         val zone = ZoneId.systemDefault()
@@ -125,22 +150,38 @@ class TrendsViewModel(
                 isLoading = false,
                 stats = stats,
                 habits = habitSummary(meals, workouts, today.minusDays(state.rangeDays.toLong() - 1), today, zone),
-                insights = listOf("Averages use ${stats.loggedDays} complete past days. Partial and missing days are excluded.",
-                    "Protein was on target on ${stats.proteinHitDays} complete days, using the goal recorded for each day.",
-                    "${days.count { it.isLogged && !it.complete }} days are partial. Missing historical goals are not inferred.")
+                insights = observations(days, today, state.targets)
             )
         }
         recomputeGoalSuggestion()
     }
 
+    /** Coverage first, then patterns found in complete past days only. */
+    private fun observations(days: List<com.kalotracker.app.core.ai.DayTotals>, today: LocalDate,
+                             targets: NutritionTargets): List<String> {
+        val complete = days.filter { it.complete && it.date < today && it.isLogged }
+        val partial = days.count { it.isLogged && !(it.complete && it.date < today) }
+        val coverage = "Based on ${complete.size} complete ${if (complete.size == 1) "day" else "days"} of the last ${days.size}." +
+            if (partial > 0) " $partial partly logged ${if (partial == 1) "day isn't" else "days aren't"} counted." else ""
+        val patterns = TrendAnalyzer.insights(TrendAnalyzer.stats(complete, targets, today), targets)
+        return listOf(coverage) + patterns
+    }
+
     private fun recomputeGoalSuggestion() {
         val s = _uiState.value
+        val body = userProfileRepository.body.value
+        if (body == null || body.automaticTargetProblem() != null) {
+            _uiState.update { it.copy(goalSuggestion = GoalSuggestion(body?.automaticTargetProblem()
+                ?: "Automatic target checks need an adult profile. Your journal and manual targets remain available.")) }
+            return
+        }
         // Use the last 6 weeks so the trend reflects current behaviour, not old history.
         val cutoff = System.currentTimeMillis() - 42L * 24 * 60 * 60 * 1000
         val points = s.weights.filter { it.timestamp >= cutoff }.map { WeightPoint(it.timestamp, it.weightKg) }
         val currentGoalStart = userProfileRepository.history.value.lastOrNull()?.date ?: LocalDate.now().toString()
         val suggestion = GoalAdvisor.withEvidence(s.profile.goal, points,
-            evidenceDays.filter { it.date.toString() >= currentGoalStart }, s.profile.targetCalories)
+            evidenceDays.filter { it.date.toString() >= currentGoalStart }, s.profile.targetCalories,
+            com.kalotracker.app.core.ai.TargetCalculator.minimumCalories(body))
         _uiState.update { it.copy(goalSuggestion = suggestion) }
     }
 
@@ -156,6 +197,10 @@ class TrendsViewModel(
         }
         viewModelScope.launch {
             weightRepository.log(kg)
+            // Keep the weight behind suggested targets current.
+            userProfileRepository.body.value?.let { body ->
+                if (kg in 30f..300f) userProfileRepository.saveBody(body.copy(weightKg = kg))
+            }
             _uiState.update { it.copy(weightInput = "", weightError = null) }
         }
     }
@@ -166,7 +211,9 @@ class TrendsViewModel(
 
     fun applySuggestedTarget() {
         val target = _uiState.value.goalSuggestion?.newCalorieTarget ?: return
-        userProfileRepository.setCalorieTargetKeepingSplit(target)
+        val body = userProfileRepository.body.value ?: return
+        if (body.automaticTargetProblem() != null || target < com.kalotracker.app.core.ai.TargetCalculator.minimumCalories(body)) return
+        userProfileRepository.setCalorieTargetKeepingProtein(target)
     }
 
     fun generateAiSummary() {

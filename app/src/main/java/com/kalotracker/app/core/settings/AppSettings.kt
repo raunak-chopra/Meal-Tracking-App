@@ -12,9 +12,14 @@ data class BackupSchedule(val folder: String = "", val enabled: Boolean = false,
 
 data class AiSettings(
     val apiKey: String = "",
-    val model: String = AppSettings.DEFAULT_MODEL
+    val model: String = AppSettings.DEFAULT_MODEL,
+    /** Optional second key, tried when the main key is rejected, rate-limited or unreachable. */
+    val backupApiKey: String = ""
 ) {
-    val isConfigured: Boolean get() = apiKey.isNotBlank()
+    val isConfigured: Boolean get() = apiKey.isNotBlank() || backupApiKey.isNotBlank()
+
+    /** Keys in the order they should be tried; blanks and duplicates removed. */
+    val keys: List<String> get() = listOf(apiKey, backupApiKey).map { it.trim() }.filter { it.isNotBlank() }.distinct()
 }
 
 data class ReminderSettings(
@@ -24,7 +29,7 @@ data class ReminderSettings(
 )
 
 /**
- * Device-local settings that are not nutrition goals: the user's own Gemini key/model
+ * Device-local settings that are not nutrition goals: the user's own Gemini keys (main and backup)/model
  * and reminder preferences. API keys and device-specific backup-folder grants are excluded from exports.
  */
 class AppSettings(context: Context) {
@@ -39,14 +44,16 @@ class AppSettings(context: Context) {
     private val _ai = MutableStateFlow(
         AiSettings(
             apiKey = prefs.getString(KEY_API, "") ?: "",
-            model = prefs.getString(KEY_MODEL, DEFAULT_MODEL)?.ifBlank { DEFAULT_MODEL } ?: DEFAULT_MODEL
+            model = prefs.getString(KEY_MODEL, DEFAULT_MODEL)?.ifBlank { DEFAULT_MODEL } ?: DEFAULT_MODEL,
+            backupApiKey = prefs.getString(KEY_BACKUP_API, "") ?: ""
         )
     )
     val ai: StateFlow<AiSettings> = _ai.asStateFlow()
 
-    fun saveAi(apiKey: String, model: String) {
-        val cleaned = AiSettings(apiKey.trim(), model.trim().ifBlank { DEFAULT_MODEL })
-        prefs.edit().putString(KEY_API, cleaned.apiKey).putString(KEY_MODEL, cleaned.model).apply()
+    fun saveAi(apiKey: String, model: String, backupApiKey: String = _ai.value.backupApiKey) {
+        val cleaned = AiSettings(apiKey.trim(), model.trim().ifBlank { DEFAULT_MODEL }, backupApiKey.trim())
+        prefs.edit().putString(KEY_API, cleaned.apiKey).putString(KEY_MODEL, cleaned.model)
+            .putString(KEY_BACKUP_API, cleaned.backupApiKey).apply()
         _ai.value = cleaned
     }
 
@@ -104,10 +111,14 @@ class AppSettings(context: Context) {
         editor.apply()
     }
 
+    fun hasSeenPhotoDisclosure(): Boolean = prefs.getBoolean("photo_disclosure_seen", false)
+    fun acknowledgePhotoDisclosure() { prefs.edit().putBoolean("photo_disclosure_seen", true).apply() }
+
     companion object {
         const val DEFAULT_MODEL = "gemini-flash-latest"
         private const val KEY_API = "gemini_api_key"
         private const val KEY_MODEL = "gemini_model"
+        private const val KEY_BACKUP_API = "gemini_backup_api_key"
         private const val KEY_REMINDER_ON = "reminder_enabled"
         private const val KEY_REMINDER_HOUR = "reminder_hour"
         private const val KEY_REMINDER_MINUTE = "reminder_minute"

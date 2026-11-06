@@ -53,6 +53,13 @@ class KaloWidget : GlanceAppWidget() {
             0
         }
 
+        val workouts = try {
+            db.workoutDao().getWorkoutsBetween(startOfDay, endOfDay)
+        } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel } catch (_: Exception) {
+            readFailed = true
+            emptyList()
+        }
+
         val prefs = context.getSharedPreferences("kalo_user_prefs", Context.MODE_PRIVATE)
         val targetCalories = prefs.getInt("target_calories", 2200)
         val targetProtein = prefs.getInt("target_protein", 160)
@@ -92,6 +99,8 @@ class KaloWidget : GlanceAppWidget() {
                 targetFat = targetFat,
                 water = totalWater,
                 targetWater = targetWater,
+                workoutCount = workouts.size,
+                workoutMinutes = workouts.sumOf { it.workout.durationMinutes },
                 openAppIntent = openAppIntent,
                 snapMealIntent = snapMealIntent
             )
@@ -113,6 +122,8 @@ private fun GlanceWidgetContent(
     targetFat: Int,
     water: Int,
     targetWater: Int,
+    workoutCount: Int = 0,
+    workoutMinutes: Int = 0,
     openAppIntent: Intent,
     snapMealIntent: Intent
 ) {
@@ -137,7 +148,7 @@ private fun GlanceWidgetContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "KALO",
+                    text = "BOWLFUL",
                     style = TextStyle(
                         color = ColorProvider(palette.accent),
                         fontSize = 11.sp,
@@ -216,7 +227,14 @@ private fun GlanceWidgetContent(
                 Spacer(modifier = GlanceModifier.defaultWeight())
                 MacroPillItem("F", "${fat}g", palette.fat, palette.text)
                 Spacer(modifier = GlanceModifier.defaultWeight())
-                MacroPillItem("Water", "${water}ml", palette.protein, palette.text)
+                MacroPillItem("Water", "${water}ml", palette.water, palette.text)
+                Spacer(modifier = GlanceModifier.defaultWeight())
+                MacroPillItem(
+                    "Fit",
+                    if (workoutCount > 0) "${workoutMinutes}m ✓" else "0m",
+                    palette.protein,
+                    palette.text
+                )
             }
         }
     }

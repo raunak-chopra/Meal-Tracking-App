@@ -1,115 +1,80 @@
 package com.kalotracker.app.core.designsystem.components
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
 import com.kalotracker.app.core.designsystem.*
+import com.kalotracker.app.core.health.StepReadingState
 
 @Composable
 fun StepGaugeCard(
     currentSteps: Long,
     stepGoal: Long = 10000L,
     activeCaloriesBurned: Double = 0.0,
-    syncSource: String = "Samsung Health / Google Fit",
+    syncSource: String = "Health Connect",
     onConnectHealthClick: (() -> Unit)? = null,
     isHealthConnected: Boolean = true,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    readingState: StepReadingState = if (isHealthConnected) StepReadingState.READY else StepReadingState.PERMISSION_REQUIRED,
+    onRetry: (() -> Unit)? = null
 ) {
-    val progress = (currentSteps.toFloat() / stepGoal).coerceIn(0f, 1f)
-
-    Box(
-        modifier = modifier
+    val targetFraction = if (stepGoal > 0) (currentSteps.toFloat() / stepGoal).coerceIn(0f, 1f) else 0f
+    val animatedFraction by animateFloatAsState(
+        targetValue = targetFraction,
+        animationSpec = spring(stiffness = Spring.StiffnessLow),
+        label = "stepProgress"
+    )
+    Column(
+        modifier
             .fillMaxWidth()
             .background(KaloSurface, RoundedCornerShape(20.dp))
-            .padding(20.dp)
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(if (isHealthConnected) KaloSteps else KaloWarning)
-                    )
+        Text("Steps", style = KaloTypography.titleMedium, color = KaloTextPrimary, modifier = Modifier.semantics { heading() })
+        when (readingState) {
+            StepReadingState.READY -> {
+                Column(Modifier.semantics(mergeDescendants = true) {}) {
                     Text(
-                        text = if (isHealthConnected) "HEALTH CONNECT" else "SYNC DISCONNECTED",
-                        style = KaloTypography.labelSmall,
-                        color = if (isHealthConnected) KaloSteps else KaloWarning
-                    )
-                }
-
-                Text(
-                    text = syncSource,
-                    style = KaloTypography.bodyMedium,
-                    color = KaloTextMuted
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text(
-                        text = "%,d".format(currentSteps),
-                        style = KaloTypography.displayMedium,
+                        "%,d steps".format(currentSteps),
+                        style = KaloTypography.headlineMedium.copy(fontFeatureSettings = TabularFontFeature),
                         color = KaloTextPrimary
                     )
                     Text(
-                        text = "of %,d goal".format(stepGoal),
-                        style = KaloTypography.bodyMedium,
+                        if (stepGoal > 0) "%,d step target".format(stepGoal) else "No step target",
                         color = KaloTextSecondary
                     )
                 }
-
-                if (activeCaloriesBurned > 0) {
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            text = "${activeCaloriesBurned.toInt()} kcal",
-                            style = KaloTypography.titleLarge,
-                            color = KaloCalories
-                        )
-                        Text(
-                            text = "Active Burn",
-                            style = KaloTypography.bodyMedium,
-                            color = KaloTextMuted
-                        )
-                    }
-                }
+                if (stepGoal > 0) LinearProgressIndicator(
+                    progress = { animatedFraction },
+                    modifier = Modifier.fillMaxWidth().height(6.dp),
+                    color = KaloSteps,
+                    trackColor = KaloDivider,
+                    strokeCap = StrokeCap.Round
+                )
+                if (activeCaloriesBurned > 0) Text("${activeCaloriesBurned.toInt()} kcal active energy", color = KaloTextSecondary)
+                Text(syncSource, style = KaloTypography.bodyMedium, color = KaloTextSecondary)
             }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(3.dp)),
-                color = KaloSteps,
-                trackColor = KaloSurfaceElevated,
-                strokeCap = StrokeCap.Round
-            )
+            StepReadingState.SYNCING -> Text("Reading Health Connect…", color = KaloTextSecondary)
+            StepReadingState.EMPTY -> Text("Connected · no step readings for this day", color = KaloTextSecondary)
+            StepReadingState.PERMISSION_REQUIRED -> Text("Connect Health Connect to read steps. No reading is available yet.", color = KaloTextSecondary)
+            StepReadingState.UNAVAILABLE -> Text("Health Connect is unavailable on this device.", color = KaloTextSecondary)
+            StepReadingState.ERROR -> Text("Couldn't read steps. Try again.", color = KaloTextSecondary)
+        }
+        if (readingState == StepReadingState.ERROR || readingState == StepReadingState.EMPTY) {
+            onRetry?.let { TextButton(onClick = it, modifier = Modifier.heightIn(min = 48.dp)) { Text("Refresh steps") } }
+        } else if (readingState == StepReadingState.PERMISSION_REQUIRED || readingState == StepReadingState.UNAVAILABLE) {
+            onConnectHealthClick?.let { TextButton(onClick = it, modifier = Modifier.heightIn(min = 48.dp)) { Text("Connect steps") } }
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.kalotracker.app.core.database.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -42,5 +43,7 @@ data class FoodItemEntity(
     val protein: Float,
     val carbs: Float,
     val fat: Float,
-    val confidence: Float = 1.0f
+    val confidence: Float = 1.0f,
+    /** "g" or "ml"; portionGrams holds the amount in this unit. */
+    @ColumnInfo(defaultValue = "g") val unit: String = "g"
 )
