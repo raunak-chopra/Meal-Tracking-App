@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Schedules a once-a-day "did you log your meals?" nudge. Each run re-schedules the next day,
- * so the time stays exact (periodic work would drift by up to its flex window).
+ * to request the chosen local time again. WorkManager may defer delivery for system/battery reasons.
  */
 object ReminderScheduler {
 

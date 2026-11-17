@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import com.kalotracker.app.core.ai.GoalType
+import kotlin.math.roundToInt
 
 data class UserProfile(
     val targetCalories: Int = 2200,
@@ -112,6 +113,33 @@ class UserProfileRepository(context: Context) {
         _profile.value = updated
     }
 
+    private val _body = MutableStateFlow(loadBody())
+    /** Height, weight, age, sex and activity, or null until the user fills them in. */
+    val body: StateFlow<com.kalotracker.app.core.ai.BodyProfile?> = _body.asStateFlow()
+
+    private fun loadBody(): com.kalotracker.app.core.ai.BodyProfile? = runCatching {
+        if (!prefs.contains("body_age")) return null
+        com.kalotracker.app.core.ai.BodyProfile(
+            sex = com.kalotracker.app.core.ai.Sex.valueOf(prefs.getString("body_sex", null)!!),
+            age = prefs.getInt("body_age", 0),
+            heightCm = prefs.getFloat("body_height_cm", 0f),
+            weightKg = prefs.getFloat("body_weight_kg", 0f),
+            activity = com.kalotracker.app.core.ai.ActivityLevel.valueOf(prefs.getString("body_activity", null)!!)
+        ).takeIf { it.problem() == null }
+    }.getOrNull()
+
+    fun saveBody(body: com.kalotracker.app.core.ai.BodyProfile) {
+        require(body.problem() == null) { body.problem()!! }
+        prefs.edit()
+            .putString("body_sex", body.sex.name)
+            .putInt("body_age", body.age)
+            .putFloat("body_height_cm", body.heightCm)
+            .putFloat("body_weight_kg", body.weightKg)
+            .putString("body_activity", body.activity.name)
+            .apply()
+        _body.value = body
+    }
+
     fun setGoal(goal: GoalType) {
         if (goal == _profile.value.goal) return
         prefs.edit().putString("goal", goal.name).apply()
@@ -130,6 +158,25 @@ class UserProfileRepository(context: Context) {
             protein = (p.targetProtein * ratio).toInt(),
             carbs = (p.targetCarbs * ratio).toInt(),
             fat = (p.targetFat * ratio).toInt(),
+            steps = p.targetSteps,
+            waterMl = p.targetWaterMl
+        )
+    }
+
+    /**
+     * Changes the calorie target while keeping protein in grams (it is set per kg of body weight)
+     * and sharing the change between carbs and fat in their current proportion.
+     */
+    fun setCalorieTargetKeepingProtein(newCalories: Int) {
+        val p = _profile.value
+        val otherEnergy = p.targetCarbs * 4 + p.targetFat * 9
+        val available = (newCalories - p.targetProtein * 4).coerceAtLeast(0)
+        val carbShare = if (otherEnergy > 0) p.targetCarbs * 4f / otherEnergy else 0.6f
+        updateTargets(
+            calories = newCalories,
+            protein = p.targetProtein,
+            carbs = (available * carbShare / 4f).roundToInt(),
+            fat = (available * (1f - carbShare) / 9f).roundToInt(),
             steps = p.targetSteps,
             waterMl = p.targetWaterMl
         )

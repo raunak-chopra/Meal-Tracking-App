@@ -27,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import com.kalotracker.app.core.data.repository.MacroPreset
 import com.kalotracker.app.core.designsystem.*
+import androidx.compose.foundation.clickable
 import com.kalotracker.app.core.designsystem.components.KaloButton
 
 @Composable
@@ -82,7 +83,7 @@ fun SettingsScreen(
                     .padding(20.dp)
             ) {
                 KaloButton(
-                    text = "Save Goals",
+                    text = "Save targets",
                     onClick = {
                         if (viewModel.saveGoals()) onBack()
                     }
@@ -111,13 +112,15 @@ fun SettingsScreen(
                 }
             }
             }
+            item { AboutYouSection(state = state, viewModel = viewModel) }
+
             // Section: Macro Split Presets
             item {
                 Column {
                     Text(
-                        text = "MACRO SPLIT PRESETS",
-                        style = KaloTypography.labelSmall,
-                        color = KaloTextSecondary
+                        text = "Macro split",
+                        style = KaloTypography.titleMedium,
+                        color = KaloTextPrimary
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     LazyRow(
@@ -159,9 +162,9 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     Text(
-                        text = "DAILY NUTRITION TARGETS",
-                        style = KaloTypography.labelSmall,
-                        color = KaloTextSecondary
+                        text = "Daily targets",
+                        style = KaloTypography.titleMedium,
+                        color = KaloTextPrimary
                     )
 
                     // Calories
@@ -171,6 +174,13 @@ fun SettingsScreen(
                         onValueChange = { viewModel.updateCalorieInput(it) },
                         unit = "kcal",
                         accentColor = KaloCalories
+                    )
+
+                    Text(
+                        text = "Calories follow your macros: protein and carbs 4 kcal/g, fat 9 kcal/g." +
+                            (state.splitText?.let { "\n$it" } ?: ""),
+                        style = KaloTypography.bodyMedium,
+                        color = KaloTextSecondary
                     )
 
                     // Protein
@@ -219,8 +229,6 @@ fun SettingsScreen(
                     )
                 }
             }
-
-            item { GoalTypeSection(state = state, viewModel = viewModel) }
 
             item { ReminderSection(state = state, viewModel = viewModel) }
 
@@ -275,6 +283,7 @@ fun AiSettingsSection(
     modifier: Modifier = Modifier
 ) {
     var showKey by remember { mutableStateOf(false) }
+    var showBackupKey by remember { mutableStateOf(false) }
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -287,7 +296,7 @@ fun AiSettingsSection(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = "AI MEAL SCANNING", style = KaloTypography.labelSmall, color = KaloTextSecondary)
+            Text(text = "Photo logging", style = KaloTypography.titleMedium, color = KaloTextPrimary)
             Text(
                 text = if (state.aiConfigured) "Key saved" else "Not set up",
                 style = KaloTypography.labelSmall,
@@ -296,8 +305,8 @@ fun AiSettingsSection(
         }
 
         Text(
-            text = "Photo scanning uses your own Google Gemini API key (free tier available at aistudio.google.com). " +
-                "It is stored only on this phone. Without a key, photo scanning is off; barcode and manual logging still work.",
+            text = "Photos are read with your own Google Gemini API key (free at aistudio.google.com). " +
+                "Keys stay on this phone. Without one, use barcode or search instead.",
             style = KaloTypography.bodyMedium,
             color = KaloTextMuted
         )
@@ -315,6 +324,19 @@ fun AiSettingsSection(
         )
 
         OutlinedTextField(
+            value = state.backupKeyInput,
+            onValueChange = { viewModel.updateBackupKeyInput(it) },
+            label = { Text("Backup key (optional)") },
+            supportingText = { Text("Used when the main key hits its limit or stops working.") },
+            singleLine = true,
+            visualTransformation = if (showBackupKey) VisualTransformation.None else PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth(),
+            trailingIcon = {
+                TextButton(onClick = { showBackupKey = !showBackupKey }) { Text(if (showBackupKey) "Hide" else "Show") }
+            }
+        )
+
+        OutlinedTextField(
             value = state.modelInput,
             onValueChange = { viewModel.updateModelInput(it) },
             label = { Text("Model") },
@@ -326,14 +348,14 @@ fun AiSettingsSection(
             Text(
                 text = state.aiTestMessage ?: "",
                 style = KaloTypography.bodyMedium,
-                color = if (state.aiTestOk) KaloSteps else KaloFat
+                color = if (state.aiTestOk) KaloTextSecondary else KaloError
             )
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedButton(
                 onClick = { viewModel.saveAndTestAi() },
-                enabled = !state.isTestingAi && state.apiKeyInput.isNotBlank(),
+                enabled = !state.isTestingAi && (state.apiKeyInput.isNotBlank() || state.backupKeyInput.isNotBlank()),
                 modifier = Modifier.weight(1f)
             ) { Text(if (state.isTestingAi) "Testing..." else "Save & test") }
 
@@ -341,33 +363,94 @@ fun AiSettingsSection(
                 OutlinedButton(
                     onClick = { viewModel.clearAiKey() },
                     modifier = Modifier.weight(1f)
-                ) { Text("Remove key") }
+                ) { Text("Remove keys") }
             }
         }
     }
 }
 
+/** Asks for the details needed to suggest calorie, macro and water targets. */
 @Composable
-private fun GoalTypeSection(state: SettingsUiState, viewModel: SettingsViewModel) {
+private fun AboutYouSection(state: SettingsUiState, viewModel: SettingsViewModel) {
+    val body = state.body
+    val number = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal)
     Column(
-        modifier = Modifier.fillMaxWidth().background(KaloSurface, RoundedCornerShape(16.dp)).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        modifier = Modifier.fillMaxWidth().background(KaloSurface, RoundedCornerShape(20.dp)).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("YOUR GOAL", style = KaloTypography.labelSmall, color = KaloTextSecondary)
+        Text("About you", style = KaloTypography.titleMedium, color = KaloTextPrimary)
         Text(
-            "Used on the Trends screen to check whether your calorie target matches how your weight is actually moving.",
+            "Used to work out a starting calorie, protein and water target. Stays on this phone.",
             style = KaloTypography.bodyMedium,
-            color = KaloTextMuted
+            color = KaloTextSecondary
         )
+
+        Text("Goal", style = KaloTypography.labelMedium, color = KaloTextPrimary)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             com.kalotracker.app.core.ai.GoalType.entries.forEach { goal ->
-                FilterChip(
-                    selected = state.goal == goal,
-                    onClick = { viewModel.setGoal(goal) },
-                    label = { Text(goal.label) }
-                )
+                FilterChip(selected = state.goal == goal, onClick = { viewModel.setGoal(goal) }, label = { Text(goal.label) })
             }
         }
+
+        Text("Sex", style = KaloTypography.labelMedium, color = KaloTextPrimary)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            com.kalotracker.app.core.ai.Sex.entries.forEach { sex ->
+                FilterChip(selected = body.sex == sex, onClick = { viewModel.updateBody { it.copy(sex = sex) } }, label = { Text(sex.label) })
+            }
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(body.age, { v -> viewModel.updateBody { it.copy(age = v.filter(Char::isDigit).take(3)) } },
+                label = { Text("Age") }, suffix = { Text("yrs") }, singleLine = true, keyboardOptions = number, modifier = Modifier.weight(1f))
+            OutlinedTextField(body.heightCm, { v -> viewModel.updateBody { it.copy(heightCm = v.take(5)) } },
+                label = { Text("Height") }, suffix = { Text("cm") }, singleLine = true, keyboardOptions = number, modifier = Modifier.weight(1f))
+            OutlinedTextField(body.weightKg, { v -> viewModel.updateBody { it.copy(weightKg = v.take(5)) } },
+                label = { Text("Weight") }, suffix = { Text("kg") }, singleLine = true, keyboardOptions = number, modifier = Modifier.weight(1f))
+        }
+
+        Text("Activity", style = KaloTypography.labelMedium, color = KaloTextPrimary)
+        Column {
+            com.kalotracker.app.core.ai.ActivityLevel.entries.forEach { level ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                        .clickable { viewModel.updateBody { it.copy(activity = level) } }
+                ) {
+                    RadioButton(selected = body.activity == level, onClick = { viewModel.updateBody { it.copy(activity = level) } })
+                    Column {
+                        Text(level.label, style = KaloTypography.bodyLarge, color = KaloTextPrimary)
+                        Text(level.detail, style = KaloTypography.bodyMedium, color = KaloTextSecondary)
+                    }
+                }
+            }
+        }
+
+        state.bodyError?.let { Text(it, style = KaloTypography.bodyMedium, color = KaloError) }
+
+        OutlinedButton(onClick = viewModel::calculateTargets, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+            Text("Work out my targets")
+        }
+
+        state.suggestion?.let { t ->
+            Column(
+                modifier = Modifier.fillMaxWidth().background(KaloSurfaceElevated, RoundedCornerShape(16.dp)).padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text("${t.calories} kcal a day", style = KaloTypography.titleLarge, color = KaloTextPrimary)
+                Text(
+                    "Protein ${t.protein} g  ·  Carbs ${t.carbs} g  ·  Fat ${t.fat} g  ·  Water ${t.waterMl} ml",
+                    style = KaloTypography.bodyMedium.copy(fontFeatureSettings = TabularFontFeature),
+                    color = KaloTextPrimary
+                )
+                Text(
+                    "Maintenance is about ${t.maintenanceCalories} kcal; at rest about ${t.restingCalories} kcal.",
+                    style = KaloTypography.bodyMedium,
+                    color = KaloTextSecondary
+                )
+                KaloButton(text = "Use these targets", onClick = viewModel::applySuggestion, modifier = Modifier.padding(top = 6.dp))
+            }
+        }
+        state.targetsMessage?.let { Text(it, style = KaloTypography.bodyMedium, color = KaloTextSecondary) }
     }
 }
 
@@ -399,9 +482,9 @@ private fun ReminderSection(state: SettingsUiState, viewModel: SettingsViewModel
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("DAILY REMINDER", style = KaloTypography.labelSmall, color = KaloTextSecondary)
+                Text("Daily reminder", style = KaloTypography.titleMedium, color = KaloTextPrimary)
                 Text(
-                    "A nudge only when fewer than 2 meals are logged that day.",
+                    "Around your chosen time, only with fewer than 2 meals and an open day's log.",
                     style = KaloTypography.bodyMedium,
                     color = KaloTextMuted
                 )
@@ -464,7 +547,7 @@ private fun DataSection(state: SettingsUiState, viewModel: SettingsViewModel) {
         modifier = Modifier.fillMaxWidth().background(KaloSurface, RoundedCornerShape(16.dp)).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("YOUR DATA", style = KaloTypography.labelSmall, color = KaloTextSecondary)
+        Text("Your data", style = KaloTypography.titleMedium, color = KaloTextPrimary)
         Text(
             "Logs are stored on this phone without an account. Optional Gemini analysis sends your selected photo or trend summary; barcode lookup sends the barcode to Open Food Facts. " +
                 "Complete ZIP archives include photos and your library. JSON is a smaller data-only backup. Automatic backups use the folder you choose; a cloud-backed folder may be synced by its provider.",
@@ -476,7 +559,7 @@ private fun DataSection(state: SettingsUiState, viewModel: SettingsViewModel) {
             Text(
                 state.dataMessage ?: "",
                 style = KaloTypography.bodyMedium,
-                color = if (state.dataOk) KaloSteps else KaloFat
+                color = if (state.dataOk) KaloTextSecondary else KaloError
             )
         }
 
@@ -507,7 +590,7 @@ private fun DataSection(state: SettingsUiState, viewModel: SettingsViewModel) {
             onClick = { confirmDelete = true },
             enabled = !state.dataBusy,
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = KaloFat)
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = KaloError)
         ) { Text("Delete all my data") }
     }
 
@@ -526,7 +609,7 @@ private fun DataSection(state: SettingsUiState, viewModel: SettingsViewModel) {
                 TextButton(onClick = {
                     confirmDelete = false
                     viewModel.deleteAllData()
-                }) { Text("Delete", color = KaloFat) }
+                }) { Text("Delete", color = KaloError) }
             },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } }
         )

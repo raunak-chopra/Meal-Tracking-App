@@ -27,7 +27,7 @@ import com.kalotracker.app.core.database.entity.WorkoutEntity
         DayStatusEntity::class, GoalHistoryEntity::class, SavedFoodEntity::class, BarcodeCacheEntity::class, WorkoutRoutineEntity::class,
         WeightLogEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class KaloDatabase : RoomDatabase() {

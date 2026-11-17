@@ -27,7 +27,10 @@ class WaterRepository(
                 milliliters = milliliters,
                 timestamp = timestamp
             )
-            waterDao.insertWaterLog(entity)
+            val date = java.time.Instant.ofEpochMilli(timestamp).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+            val start = date.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+            val end = date.plusDays(1).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() - 1
+            waterDao.insertWaterLogChecked(entity, start, end)
         }
 
     suspend fun undoLastWaterLog(startOfDay: Long, endOfDay: Long) =

@@ -46,8 +46,8 @@ class BackupCodecTest {
 
     @Test
     fun garbageAndForeignFilesAreRejectedWithClearMessages() {
-        assertRejected("not json", "valid Kalo backup")
-        assertRejected("""{"app":"other","version":1}""", "wasn't created by Kalo")
+        assertRejected("not json", "valid Bowlful backup")
+        assertRejected("""{"app":"other","version":1}""", "wasn't created by Bowlful")
         assertRejected("""{"app":"kalo","version":99}""", "newer version")
         assertRejected("""{"app":"kalo","version":1,"meals":[{"id":"","title":"x","totalCalories":1,"totalProteinGrams":0,"totalCarbsGrams":0,"totalFatGrams":0,"timestamp":1}]}""", "without ids")
     }
@@ -62,7 +62,7 @@ class BackupCodecTest {
     fun csvEscapesCommasAndQuotes() {
         val csv = BackupCodec.mealsToCsv(sample().meals)
         val lines = csv.trim().lines()
-        assertEquals("date_time,meal,food,grams,calories,protein_g,carbs_g,fat_g", lines[0])
+        assertEquals("date_time,meal,food,amount,unit,calories,protein_g,carbs_g,fat_g", lines[0])
         assertTrue(lines[1], lines[1].contains("\"Oats, with \"\"milk\"\"\""))
         assertEquals(2, lines.size)
     }

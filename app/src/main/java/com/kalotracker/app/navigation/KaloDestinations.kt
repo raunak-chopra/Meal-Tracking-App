@@ -3,11 +3,13 @@ package com.kalotracker.app.navigation
 object KaloDestinations {
     const val DASHBOARD = "dashboard"
     const val MEALS = "meals"
+    const val WORKOUTS_HUB = "workouts_hub"
     const val CAMERA = "camera"
     const val MANUAL_MEAL = "manual_meal"
     const val EDIT_WORKOUT = "edit_workout/{workoutId}"
     fun editWorkout(id: String) = "edit_workout/$id"
     const val WORKOUT = "workout"
+    const val DETAILED_WORKOUT = "detailed_workout"
     const val HEALTH_PERMISSIONS = "health_permissions"
     const val SETTINGS = "settings"
     const val BARCODE_SCANNER = "barcode_scanner"

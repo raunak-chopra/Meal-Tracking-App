@@ -215,7 +215,7 @@ fun BarcodeScannerScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Keyboard,
-                        contentDescription = "Enter Manually",
+                        contentDescription = "Enter barcode by hand",
                         tint = Color.White
                     )
                 }
@@ -296,11 +296,13 @@ fun BarcodeScannerScreen(
                     saveError = state.errorMessage,
                     onRefresh = viewModel::refreshProduct,
                     portionGrams = state.portionGrams,
+                    amountInput = state.amountText,
                     calories = state.currentCalories,
                     protein = state.currentProtein,
                     carbs = state.currentCarbs,
                     fat = state.currentFat,
                     onAdjustPortion = { mult -> viewModel.adjustPortion(mult) },
+                    onPortionInputChange = viewModel::updatePortionInput,
                     onRescan = { viewModel.resumeScanning() },
                     onConfirm = {
                         if (!state.canLog) return@ScannedProductCard
@@ -330,7 +332,7 @@ fun BarcodeScannerScreen(
             containerColor = KaloSurface,
             title = {
                 Text(
-                    text = "Enter Barcode",
+                    text = "Enter barcode",
                     style = KaloTypography.titleLarge,
                     color = KaloTextPrimary
                 )
@@ -382,17 +384,20 @@ private fun ScannedProductCard(
     saveError: String?,
     onRefresh: () -> Unit,
     portionGrams: Float,
+    amountInput: String,
     calories: Int,
     protein: Float,
     carbs: Float,
     fat: Float,
     onAdjustPortion: (Float) -> Unit,
     onRescan: () -> Unit,
+    onPortionInputChange: (String) -> Unit,
     onConfirm: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     val maxHeight = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp * 0.85f
+    val amountValid = parseBarcodePortion(amountInput)?.let { it == portionGrams } == true
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -450,25 +455,31 @@ private fun ScannedProductCard(
             Spacer(modifier = Modifier.height(16.dp))
 
             // Portion Adjuster
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
                     .background(KaloSurfaceElevated)
                     .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    text = "Portion: ${portionGrams.toInt()}g",
-                    style = KaloTypography.titleMedium,
-                    color = KaloTextPrimary
+                OutlinedTextField(
+                    value = amountInput,
+                    onValueChange = onPortionInputChange,
+                    label = { Text("Amount eaten") },
+                    suffix = { Text(product.unit) },
+                    isError = !amountValid,
+                    supportingText = if (!amountValid) { { Text("5–2500 ${product.unit}") } } else null,
+                    singleLine = true,
+                    enabled = !isSaving,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth()
                 )
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PortionButton(label = "-10%", onClick = { onAdjustPortion(0.9f) })
-                    PortionButton(label = "+10%", onClick = { onAdjustPortion(1.1f) })
-                    PortionButton(label = "×2", onClick = { onAdjustPortion(2.0f) })
+                    PortionButton(label = "-10%", enabled = !isSaving, onClick = { onAdjustPortion(0.9f) })
+                    PortionButton(label = "+10%", enabled = !isSaving, onClick = { onAdjustPortion(1.1f) })
+                    PortionButton(label = "×2", enabled = !isSaving, onClick = { onAdjustPortion(2.0f) })
                 }
             }
 
@@ -481,25 +492,25 @@ private fun ScannedProductCard(
             ) {
                 MacroStatPill(
                     label = "CALORIES",
-                    value = "$calories kcal",
+                    value = if (amountValid) "$calories kcal" else "—",
                     color = KaloCalories,
                     modifier = Modifier.weight(1f)
                 )
                 MacroStatPill(
-                    label = "PROTEIN",
-                    value = "${"%.1f".format(protein)}g",
+                    label = "Protein",
+                    value = if (amountValid) "${"%.1f".format(protein)}g" else "—",
                     color = KaloProtein,
                     modifier = Modifier.weight(1f)
                 )
                 MacroStatPill(
-                    label = "CARBS",
-                    value = "${"%.1f".format(carbs)}g",
+                    label = "Carbs",
+                    value = if (amountValid) "${"%.1f".format(carbs)}g" else "—",
                     color = KaloCarbs,
                     modifier = Modifier.weight(1f)
                 )
                 MacroStatPill(
-                    label = "FAT",
-                    value = "${"%.1f".format(fat)}g",
+                    label = "Fat",
+                    value = if (amountValid) "${"%.1f".format(fat)}g" else "—",
                     color = KaloFat,
                     modifier = Modifier.weight(1f)
                 )
@@ -524,7 +535,7 @@ private fun ScannedProductCard(
             if (!product.fromCatalog) TextButton(onClick = onRefresh, enabled = !isSaving) { Text("Refresh label data") }
             // Log Meal / Confirm Button
             KaloButton(
-                text = "Log Food ($calories kcal)",
+                text = if (amountValid) "Save · $calories kcal" else "Check amount",
                 onClick = onConfirm,
                 loading = isSaving,
                 enabled = canLog
@@ -536,13 +547,15 @@ private fun ScannedProductCard(
 @Composable
 private fun PortionButton(
     label: String,
+    enabled: Boolean,
     onClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
+            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(KaloBorder)
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center
     ) {

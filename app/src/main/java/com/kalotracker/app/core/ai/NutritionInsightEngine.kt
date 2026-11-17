@@ -8,11 +8,15 @@ data class NutritionInsight(
 
 enum class InsightType {
     PROTEIN,
-    ENERGY,
-    WORKOUT_RECOVERY,
-    HYDRATION_OR_BALANCE
+    HYDRATION
 }
 
+/**
+ * At most one short observation for the day, or null when there is nothing useful to add.
+ *
+ * Calories already show their own logged / target / delta, so they never get a card.
+ * Exercise is never suggested as a way to "balance" food.
+ */
 object NutritionInsightEngine {
 
     fun generateDailyInsight(
@@ -20,66 +24,31 @@ object NutritionInsightEngine {
         consumedCalories: Int,
         targetProtein: Int,
         consumedProtein: Int,
-        targetCarbs: Int,
-        consumedCarbs: Int,
-        targetFat: Int,
-        consumedFat: Int,
-        workoutCount: Int,
-        activeBurn: Double,
-        targetWaterMl: Int = 2500,
-        consumedWaterMl: Int = 0
-    ): NutritionInsight {
-        val remainingCal = targetCalories - consumedCalories
-        val remainingProtein = targetProtein - consumedProtein
+        targetWaterMl: Int,
+        consumedWaterMl: Int,
+        isToday: Boolean = true
+    ): NutritionInsight? {
+        // Too early in the day (or nothing logged) to say anything fair.
+        if (targetCalories <= 0 || consumedCalories < targetCalories * 0.5f) return null
+        val soFar = if (isToday) " so far" else ""
 
-        // Priority 1: High deficit in protein
-        if (consumedCalories > (targetCalories * 0.4f) && remainingProtein > (targetProtein * 0.4f)) {
+        if (targetProtein > 0 && consumedProtein < targetProtein * 0.6f) {
             return NutritionInsight(
-                title = "Protein Deficit Detected",
-                description = "You have ${remainingProtein}g of protein left today. Consider adding a high-protein source like 170g nonfat Greek yogurt (~17g P) or a whey shake (~25g P).",
+                title = "Protein is behind",
+                description = "$consumedProtein g of your $targetProtein g target$soFar, with ${percent(consumedCalories, targetCalories)}% of your energy logged.",
                 type = InsightType.PROTEIN
             )
         }
 
-        // Priority 2: Workouts logged with active calorie burn
-        if (workoutCount > 0) {
+        if (targetWaterMl > 0 && consumedWaterMl < targetWaterMl * 0.4f) {
             return NutritionInsight(
-                title = "Post-Workout Recovery",
-                description = "$workoutCount workout logged (${activeBurn.toInt()} active kcal). Prioritize complex carbs and lean protein to optimize muscle glycogen replenishment and tissue repair.",
-                type = InsightType.WORKOUT_RECOVERY
+                title = "Water is low",
+                description = "$consumedWaterMl ml of your $targetWaterMl ml target$soFar.",
+                type = InsightType.HYDRATION
             )
         }
-
-        // Priority 3: Low hydration alert
-        if (consumedCalories > (targetCalories * 0.4f) && targetWaterMl > 0 && consumedWaterMl < (targetWaterMl * 0.4f)) {
-            val remainingWater = targetWaterMl - consumedWaterMl
-            return NutritionInsight(
-                title = "Hydration Lag",
-                description = "You have logged $consumedWaterMl ml of water today ($remainingWater ml remaining). Boost fluid intake to sustain metabolic rate and workout performance.",
-                type = InsightType.HYDRATION_OR_BALANCE
-            )
-        }
-
-        // Priority 4: Calorie target status
-        if (remainingCal in 1..400) {
-            return NutritionInsight(
-                title = "Optimal Calorie Pacing",
-                description = "You have $remainingCal kcal remaining. A balanced, light meal will keep you directly on target for your daily horizon.",
-                type = InsightType.ENERGY
-            )
-        } else if (remainingCal < 0) {
-            return NutritionInsight(
-                title = "Calorie Surplus",
-                description = "You are ${-remainingCal} kcal over your baseline goal. Daily steps and active movement will help balance energy expenditure.",
-                type = InsightType.ENERGY
-            )
-        }
-
-        // Default: balanced
-        return NutritionInsight(
-            title = "Clean Macro Horizon",
-            description = "${consumedCalories} kcal logged across ${consumedProtein}g P • ${consumedCarbs}g C • ${consumedFat}g F. Hydration: $consumedWaterMl ml.",
-            type = InsightType.HYDRATION_OR_BALANCE
-        )
+        return null
     }
+
+    private fun percent(part: Int, whole: Int) = (part * 100f / whole).toInt()
 }

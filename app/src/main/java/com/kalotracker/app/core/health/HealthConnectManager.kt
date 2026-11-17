@@ -11,11 +11,14 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
+enum class StepReadingState { SYNCING, PERMISSION_REQUIRED, UNAVAILABLE, EMPTY, READY, ERROR }
+
 data class HealthDataSummary(
     val steps: Long = 0L,
     val activeCaloriesBurned: Double = 0.0,
     val isConnected: Boolean = false,
-    val syncSource: String = "Health Connect"
+    val syncSource: String = "Health Connect",
+    val stepState: StepReadingState = StepReadingState.SYNCING
 )
 
 enum class HealthConnectAvailability {
@@ -66,7 +69,7 @@ class HealthConnectManager(private val context: Context) {
      */
     suspend fun readHealthDataForDate(date: LocalDate): HealthDataSummary {
         val client = healthConnectClient
-            ?: return HealthDataSummary(isConnected = false, syncSource = "Health Connect unavailable")
+            ?: return HealthDataSummary(isConnected = false, syncSource = "Health Connect unavailable", stepState = StepReadingState.UNAVAILABLE)
 
         val zoneId = ZoneId.systemDefault()
         val startOfDay = date.atStartOfDay(zoneId).toInstant()
@@ -78,7 +81,7 @@ class HealthConnectManager(private val context: Context) {
 
         return try {
             if (!hasAllPermissions()) {
-                return HealthDataSummary(isConnected = false, syncSource = "Permission needed")
+                return HealthDataSummary(isConnected = false, syncSource = "Permission needed", stepState = StepReadingState.PERMISSION_REQUIRED)
             }
             val response = client.aggregate(
                 AggregateRequest(
@@ -90,14 +93,16 @@ class HealthConnectManager(private val context: Context) {
                 )
             )
 
-            val steps = response[StepsRecord.COUNT_TOTAL] ?: 0L
+            val reading = response[StepsRecord.COUNT_TOTAL]
+            val steps = reading ?: 0L
             val energy = response[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories ?: 0.0
 
             HealthDataSummary(
                 steps = steps,
                 activeCaloriesBurned = energy,
                 isConnected = true,
-                syncSource = "Health Connect"
+                syncSource = "Health Connect · read at " + java.time.ZonedDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")),
+                stepState = if(reading == null) StepReadingState.EMPTY else StepReadingState.READY
             )
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
@@ -106,7 +111,8 @@ class HealthConnectManager(private val context: Context) {
                 steps = 0L,
                 activeCaloriesBurned = 0.0,
                 isConnected = false,
-                syncSource = "Couldn't read Health Connect"
+                syncSource = "Couldn't read Health Connect",
+                stepState = StepReadingState.ERROR
             )
         }
     }

@@ -1,27 +1,42 @@
-# Kalo — Android meal, workout & progress tracker
+<p align="center"><img src="docs/brand/bowlful-lockup.png" alt="Bowlful" width="320"></p>
 
-Kalo is a native Android app (Kotlin, Jetpack Compose, Room) for personal tracking: log food by photo, barcode or
+# Bowlful — Android meal, workout & progress tracker
+
+Bowlful (formerly Kalo) is a native Android app (Kotlin, Jetpack Compose, Room) for personal tracking: log food by photo, description, barcode or
 search, log workouts and water, and see whether your habits are moving you toward your goal.
 
 **Local storage by design.** Tracking records are stored on the phone. There are no accounts or app backend. The
-external services are (1) Google Gemini, when you scan a meal photo or ask for an AI summary, using *your own*
+external services are (1) Google Gemini, when you scan a meal photo, describe a meal in words or ask for an AI summary, using *your own*
 API key, and (2) Open Food Facts, for barcode lookups.
 
 ## Features
 
+- **Optional adult targets** - Settings > About you asks for sex, age, height, weight and activity, then suggests daily calories (Mifflin-St Jeor resting energy x activity; -20% to lose fat, +10% to build muscle), protein, carbs, fat and water. You review them before they are applied. Automatic suggestions require age 18 or older; this check does not establish suitability for every adult. Journaling and manual targets remain available without a body profile.
 - **AI meal scan** - photograph a meal (or pick from the gallery); Gemini estimates foods and portions.
-  Every name and weight is editable, you can add/remove foods, add a note and re-analyze, and set the meal
+  Each food shows its amount in grams, or millilitres for drinks, and you can edit it right on the review screen. Every name and amount is editable, you can add/remove foods, add a note and re-analyze, and set the meal
   time. Nothing is saved until you confirm. If the key is missing, the photo is not food, or the network is
-  down, you get a clear message, never a made-up meal.
+  down, you get a clear message, never a made-up meal. If a dish is misread (say paneer bharta for chicken
+  bharta), correct its name and tap **Update nutrition**, which also works when editing a saved meal.
+  Renamed foods need updated/edited nutrition or an explicit **Keep these values** choice before saving.
+  Invalid visible amounts block Save; malformed AI responses fail rather than silently dropping foods. Photo assumptions are shown during review.
+- **Describe a meal** - choose **Add meal > Describe, search & quick log**, type what you ate
+  ("half a chicken at Nando's with peri-peri chips") and tap
+  **Estimate nutrition**. Gemini uses your dish names as written and adds editable foods with approximate
+  calories and macros to the draft. Photo/text estimates require AI setup; search is available without a key.
 - **Barcode scan** (on-device ML Kit + Open Food Facts). Unknown products or missing calorie data show
   "not found" with scan-again / enter-manually, never invented values.
-- **Manual logging** from an 82-food catalog, with recent meals for one-tap re-logging.
+- **Manual logging** - choose **Add meal > Recent meals** to search recent meal names and ingredients,
+  review copied portions and save. Search covers up to the latest 200 records before grouping exact repeats;
+  different foods/portions under the same meal name stay separate. Adding a recent meal offers draft Undo.
+  The 82-food common list remains available without an AI key. Diary search covers the selected day;
+  library search includes saved names and ingredients and respects type/favorite filters. Search words can
+  appear in any order, with case, extra spaces and punctuation handled consistently.
 - **Edit and undo** - edit any logged meal, undo deletes, log a meal again.
 - **Workouts** with multiple exercises, saved routines, editing, set completion, a rest timer, previous-session prefill and a progressive-overload hint.
 - **Water, goals and macro presets**, Health Connect steps and active calories, home-screen widget.
 - **Trends & coaching** - 7/30-day calorie and protein charts, streak, plain-language insights, weight log
-  with historical daily goals and evidence-gated calorie-target checks, optional AI weekly summary. Mark fully logged days complete on the dashboard; averages exclude partial/missing days and today.
-- **Daily reminder** that only fires when the day looks under-logged.
+  with historical daily goals and evidence-gated calorie-target checks, optional AI weekly summary. Mark fully logged days complete on the dashboard, or review/reopen past days directly in Progress; averages exclude partial/missing days and today. Meal count and calories never mark a day complete automatically.
+- **Daily reminder** around the chosen time when fewer than two meals are logged and the day has not been explicitly marked complete. Exercise does not affect this meal reminder.
 - **Personal foods** - label values, favorites, editable templates, recipes with cooked yield, quick kcal/protein estimates and direct nutrition corrections. Previously looked-up barcodes work from a local cache.
 - **Your data** - photo-inclusive ZIP archives, daily dated backups to a chosen folder, restore preview/merge, JSON backup/import, CSV export and delete-all. API keys and folder grants are excluded from exports.
 
@@ -40,9 +55,10 @@ copying it to the phone.
 
 ### Turn on photo scanning
 1. Create a free key at <https://aistudio.google.com/apikey>.
-2. In the app: Settings > AI meal scanning > paste the key > **Save & test**.
+2. In the app: Settings > Photo logging > paste the key > **Save & test**.
+3. Optional: add a second key as the **Backup key**. It is used only when the main key is rejected, rate-limited or unreachable.
 
-The key is stored only in the app's private storage. The default model is the rolling alias
+Keys are stored only in the app's private storage. The default model is the rolling alias
 `gemini-flash-latest`; you can change it in Settings if Google retires or renames a model.
 
 ## Project layout
@@ -90,7 +106,7 @@ Warm Precision / Open Plate is applied with system/light/dark appearance, Today 
 
 ## Everyday habits
 
-Photo meals now lead with approximate calories and optional portion adjustments; grams and macros are expandable. Daily fitness logs short bodyweight sessions with remembered choices. Photo-meal drafts recover locally. See [implementation and verification](docs/HABIT_TRACKING.md) for scope, review, evidence and device-testing limits.
+Photo meals now lead with approximate calories and optional portion adjustments; grams and macros are expandable. Daily fitness logs short bodyweight sessions with remembered choices. An unfinished photo meal is kept aside as a small Resume chip on the camera, so it never blocks a new photo. See [implementation and verification](docs/HABIT_TRACKING.md) for scope, review, evidence and device-testing limits.
 
 ## Releases and contributions
 
@@ -101,7 +117,7 @@ New to GitHub? Start with [the project GitHub guide](docs/GITHUB_GUIDE.md).
 The working tree can contain unreleased development features; use tagged releases to identify versions.
 
 Contributions should include relevant verification and fictional test data. Read [security and privacy guidance](SECURITY.md)
-before filing reports. Optional AI analysis sends selected images to Gemini; local backups can contain personal health records and photos.
+before filing reports. Optional AI analysis sends selected images or typed meal descriptions to Gemini; local backups can contain personal health records and photos.
 
 Source code is licensed under the [MIT License](LICENSE). Bundled Open Food Facts data
 retains its own licenses; see [third-party notices](THIRD_PARTY_NOTICES.md).

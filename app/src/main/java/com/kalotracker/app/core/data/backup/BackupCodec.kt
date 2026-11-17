@@ -47,8 +47,22 @@ data class BackupProfile(
     val fat: Int,
     val steps: Long,
     val waterMl: Int,
-    val goal: String
+    val goal: String,
+    val body: BackupBody? = null
 )
+
+/** Details behind suggested targets; absent in older backups. */
+@Serializable
+data class BackupBody(val sex: String, val age: Int, val heightCm: Float, val weightKg: Float, val activity: String) {
+    fun toBodyProfile(): com.kalotracker.app.core.ai.BodyProfile? = runCatching {
+        com.kalotracker.app.core.ai.BodyProfile(com.kalotracker.app.core.ai.Sex.valueOf(sex), age, heightCm, weightKg,
+            com.kalotracker.app.core.ai.ActivityLevel.valueOf(activity))
+    }.getOrNull()?.takeIf { it.problem() == null }
+
+    companion object {
+        fun from(b: com.kalotracker.app.core.ai.BodyProfile) = BackupBody(b.sex.name, b.age, b.heightCm, b.weightKg, b.activity.name)
+    }
+}
 
 @Serializable
 data class BackupMeal(
@@ -73,7 +87,8 @@ data class BackupFoodItem(
     val protein: Float,
     val carbs: Float,
     val fat: Float,
-    val confidence: Float = 1f
+    val confidence: Float = 1f,
+    val unit: String = "g"
 )
 
 @Serializable
@@ -121,13 +136,13 @@ object BackupCodec {
         val file = try {
             json.decodeFromString(BackupFile.serializer(), text)
         } catch (e: SerializationException) {
-            throw BackupFormatException("This isn't a valid Kalo backup file.")
+            throw BackupFormatException("This isn't a valid Bowlful backup file.")
         } catch (e: IllegalArgumentException) {
-            throw BackupFormatException("This isn't a valid Kalo backup file.")
+            throw BackupFormatException("This isn't a valid Bowlful backup file.")
         }
-        if (file.app != BackupFile.APP_ID) throw BackupFormatException("This file wasn't created by Kalo.")
+        if (file.app != BackupFile.APP_ID) throw BackupFormatException("This file wasn't created by Bowlful.")
         if (file.version > BackupFile.CURRENT_VERSION) {
-            throw BackupFormatException("This backup is from a newer version of Kalo. Update the app to import it.")
+            throw BackupFormatException("This backup is from a newer version of Bowlful. Update the app to import it.")
         }
         if (file.version < 1) throw BackupFormatException("This backup version is not supported.")
         if (file.meals.any { it.id.isBlank() || it.items.any { i -> i.id.isBlank() } } ||
@@ -192,7 +207,7 @@ object BackupCodec {
         file.profile?.let { p ->
             val error = com.kalotracker.app.core.util.validateGoalInputs(p.calories.toString(),
                 p.protein.toString(), p.carbs.toString(), p.fat.toString(), p.steps.toString(), p.waterMl.toString())
-            if (error != null || p.goal !in setOf("LOSE", "MAINTAIN", "GAIN"))
+            if (error != null || p.goal !in setOf("LOSE", "MAINTAIN", "GAIN") || (p.body != null && p.body.toBodyProfile() == null))
                 throw BackupFormatException("The backup contains invalid goals. No data was imported.")
         }
     }
@@ -204,7 +219,7 @@ object BackupCodec {
         totalProteinGrams = meal.totalProteinGrams, totalCarbsGrams = meal.totalCarbsGrams,
         totalFatGrams = meal.totalFatGrams, notes = meal.notes, timestamp = meal.timestamp,
         items = items.map {
-            BackupFoodItem(it.id, it.name, it.portionGrams, it.calories, it.protein, it.carbs, it.fat, it.confidence)
+            BackupFoodItem(it.id, it.name, it.portionGrams, it.calories, it.protein, it.carbs, it.fat, it.confidence, it.unit)
         }
     )
 
@@ -215,7 +230,8 @@ object BackupCodec {
     )
 
     fun toFoodItemEntities(m: BackupMeal) = m.items.map {
-        FoodItemEntity(it.id, m.id, it.name, it.portionGrams, it.calories, it.protein, it.carbs, it.fat, it.confidence)
+        FoodItemEntity(it.id, m.id, it.name, it.portionGrams, it.calories, it.protein, it.carbs, it.fat, it.confidence,
+            com.kalotracker.app.core.network.portionUnit(it.unit))
     }
 
     fun toBackupWorkout(w: WorkoutEntity, sets: List<ExerciseSetEntity>) = BackupWorkout(
@@ -244,14 +260,14 @@ object BackupCodec {
         val zone = java.time.ZoneId.systemDefault()
         val fmt = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
         return buildString {
-            appendLine("date_time,meal,food,grams,calories,protein_g,carbs_g,fat_g")
+            appendLine("date_time,meal,food,amount,unit,calories,protein_g,carbs_g,fat_g")
             meals.forEach { m ->
                 val whenText = java.time.Instant.ofEpochMilli(m.timestamp).atZone(zone).format(fmt)
                 if (m.items.isEmpty()) {
-                    appendLine("$whenText,${esc(m.title)},,,${m.totalCalories},${m.totalProteinGrams},${m.totalCarbsGrams},${m.totalFatGrams}")
+                    appendLine("$whenText,${esc(m.title)},,,,${m.totalCalories},${m.totalProteinGrams},${m.totalCarbsGrams},${m.totalFatGrams}")
                 } else {
                     m.items.forEach { i ->
-                        appendLine("$whenText,${esc(m.title)},${esc(i.name)},${i.portionGrams},${i.calories},${i.protein},${i.carbs},${i.fat}")
+                        appendLine("$whenText,${esc(m.title)},${esc(i.name)},${i.portionGrams},${i.unit},${i.calories},${i.protein},${i.carbs},${i.fat}")
                     }
                 }
             }

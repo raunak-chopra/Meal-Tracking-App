@@ -21,6 +21,20 @@ class WorkoutRepository(
     suspend fun getWorkoutsBetween(start: Long, end: Long): List<WorkoutWithSets> =
         withContext(dispatcher) { workoutDao.getWorkoutsBetween(start, end) }
 
+    suspend fun getRecentWorkouts(limit: Int = 10): List<WorkoutWithSets> =
+        withContext(dispatcher) { workoutDao.getRecentWorkouts(limit) }
+
+    /** Duplicates a past workout onto the requested timestamp with fresh workout and set IDs. */
+    suspend fun duplicateWorkout(source: WorkoutWithSets, timestamp: Long = System.currentTimeMillis()) =
+        withContext(dispatcher) {
+            val newWorkoutId = java.util.UUID.randomUUID().toString()
+            val newWorkout = source.workout.copy(id = newWorkoutId, timestamp = timestamp)
+            val newSets = source.sets.map { set ->
+                set.copy(id = java.util.UUID.randomUUID().toString(), workoutId = newWorkoutId, isCompleted = true)
+            }
+            workoutDao.insertWorkoutWithSets(newWorkout, newSets)
+        }
+
     suspend fun getLastSessionSetsForExercise(exerciseName: String): List<ExerciseSetEntity> =
         withContext(dispatcher) {
             workoutDao.getLastSessionSetsForExercise(exerciseName.trim())

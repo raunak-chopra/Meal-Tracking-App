@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="120dp"
+    android:viewportWidth="200"
+    android:viewportHeight="120">
+    <!-- Widget Background Surface -->
+    <path
+        android:fillColor="#1A1512"
+        android:pathData="M16,0 H184 A16,16 0 0,1 200,16 V104 A16,16 0 0,1 184,120 H16 A16,16 0 0,1 0,104 V16 A16,16 0 0,1 16,0 Z" />
+
+    <!-- Border Outline -->
+    <path
+        android:strokeColor="#43382F"
+        android:strokeWidth="1.5"
+        android:pathData="M16,0 H184 A16,16 0 0,1 200,16 V104 A16,16 0 0,1 184,120 H16 A16,16 0 0,1 0,104 V16 A16,16 0 0,1 16,0 Z" />
+
+    <!-- Header Bowlful Mark: Cream Bowl + Turmeric Dot -->
+    <path
+        android:fillColor="#FBF5E8"
+        android:pathData="M14,22 H30 A8,8 0 0,1 14,22 Z" />
+    <path
+        android:fillColor="#E9A23B"
+        android:pathData="M19,17.5 A3,3 0 1,0 25,17.5 A3,3 0 1,0 19,17.5 Z" />
+
+    <!-- Header Brand Label Bar -->
+    <path
+        android:fillColor="#F2B454"
+        android:pathData="M36,19 H68 A3,3 0 0,1 71,22 V22 A3,3 0 0,1 68,25 H36 A3,3 0 0,1 33,22 V22 A3,3 0 0,1 36,19 Z" />
+
+    <!-- Calorie Number Bar -->
+    <path
+        android:fillColor="#FBF5E8"
+        android:pathData="M16,40 H86 A4,4 0 0,1 90,44 V50 A4,4 0 0,1 86,54 H16 A4,4 0 0,1 12,50 V44 A4,4 0 0,1 16,40 Z" />
+
+    <!-- Delta Subtitle Bar -->
+    <path
+        android:fillColor="#C9BBA8"
+        android:pathData="M16,60 H64 A2,2 0 0,1 66,62 V64 A2,2 0 0,1 64,66 H16 A2,2 0 0,1 14,64 V62 A2,2 0 0,1 16,60 Z" />
+
+    <!-- Add Meal Button Pill -->
+    <path
+        android:fillColor="#F2B454"
+        android:pathData="M132,40 H182 A8,8 0 0,1 190,48 V58 A8,8 0 0,1 182,66 H132 A8,8 0 0,1 124,58 V48 A8,8 0 0,1 132,40 Z" />
+
+    <!-- Macro Stats Bar -->
+    <path
+        android:fillColor="#251E19"
+        android:pathData="M16,80 H184 A8,8 0 0,1 192,88 V96 A8,8 0 0,1 184,104 H16 A8,8 0 0,1 8,96 V88 A8,8 0 0,1 16,80 Z" />
+
+    <!-- Macro Indicators (Protein, Carbs, Fat, Water) -->
+    <path android:fillColor="#8FD0A8" android:pathData="M22,90 H44 V94 H22 Z" />
+    <path android:fillColor="#F0A58A" android:pathData="M68,90 H90 V94 H68 Z" />
+    <path android:fillColor="#D9A6D6" android:pathData="M114,90 H136 V94 H114 Z" />
+    <path android:fillColor="#8EC5E2" android:pathData="M160,90 H182 V94 H160 Z" />
+</vector>

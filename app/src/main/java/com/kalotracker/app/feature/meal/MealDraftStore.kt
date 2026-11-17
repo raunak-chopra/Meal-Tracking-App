@@ -16,13 +16,19 @@ internal object MealDraftCodec {
     private val json = Json { ignoreUnknownKeys = true }
     fun encode(state: MealScanUiState): String = json.encodeToString(MealScanUiState.serializer(),
         state.copy(isAnalyzing = false, isSaving = false, isSaved = false, draftLoading = false,
-            resumePending = false, draftMessage = null, errorMessage = null))
+            draftMessage = null, errorMessage = null))
     fun decode(value: String): MealScanUiState = json.decodeFromString(MealScanUiState.serializer(), value).also { s ->
         require(s.items.size <= 100 && s.cookingFatGrams.isFinite() && s.cookingFatGrams in 1f..100f)
         require(s.items.all { it.portionGrams.isFinite() && it.portionGrams in 1f..5000f &&
+            (it.amountInput == null || it.amountInput.length <= 32) &&
             listOf(it.baseCaloriesPerGram, it.baseProteinPerGram, it.baseCarbsPerGram, it.baseFatPerGram).all { n -> n.isFinite() && n >= 0 } })
     }
 }
+
+/** The meal being logged right now. */
+const val MEAL_DRAFT_FILE = "meal-draft.json"
+/** An earlier unfinished meal kept aside while a new photo is logged. */
+const val PARKED_MEAL_DRAFT_FILE = "meal-draft-unfinished.json"
 
 /** One device-local draft, excluded from exports and Android backup. */
 class FileMealDraftStore(file: File) : MealDraftStore {

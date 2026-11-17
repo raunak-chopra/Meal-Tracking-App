@@ -45,14 +45,18 @@ data class WorkoutUiState(
     val otherExercises: List<WorkoutExercise> = emptyList(),
     val sessionTitle: String = "",
     val restSeconds: Int = 0,
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    val isSimpleDailyFitness: Boolean = false,
+    val loadedDailyFitnessDefaults: List<String>? = null
 )
 
 class WorkoutViewModel(
     private val workoutRepository: WorkoutRepository,
     private val personalDao: com.kalotracker.app.core.database.dao.PersonalDao? = null,
     private val workoutId: String? = null,
-    private val initialTimestamp: Long = System.currentTimeMillis()
+    private val initialTimestamp: Long = System.currentTimeMillis(),
+    /** Weight from About you, when known, so energy estimates fit the person. */
+    private val bodyWeightKg: () -> Double? = { null }
 ) : ViewModel() {
 
     val commonExercises = listOf(
@@ -85,6 +89,11 @@ class WorkoutViewModel(
     private var timer: kotlinx.coroutines.Job? = null
     private var historyRequest = 0L
     private var fitnessBodyWeight = 70.0
+    /** True once the user types their own energy figure; estimates then stop replacing it. */
+    private var caloriesEdited = false
+    private fun weightForEstimate() = bodyWeightKg()?.takeIf { it in 20.0..300.0 } ?: fitnessBodyWeight
+    private fun estimateFor(state: WorkoutUiState): String =
+        workoutEnergy(state.exerciseName, state.isCardio, state.durationMinutes.toIntOrNull() ?: 0, weightForEstimate()).toString()
     private var editLoaded = workoutId == null
     fun startRest(seconds: Int = 90) {
         timer?.cancel()
@@ -118,7 +127,7 @@ class WorkoutViewModel(
     fun saveDailyFitness(minutes: String, weightKg: String, effort: FitnessEffort,
         reps: List<String>, onSuccess: () -> Unit) {
         val state = _uiState.value
-        if (state.isSaving || state.isSaved || state.isLoading || workoutId != null) return
+        if (state.isSaving || state.isSaved || state.isLoading || !editLoaded) return
         val rows = runCatching {
             dailyFitnessExercises(minutes.toInt(), weightKg.toDouble(), effort, reps.map { it.toInt() })
         }.getOrElse {
@@ -138,6 +147,7 @@ class WorkoutViewModel(
         val error = validateActiveWorkout(s)
         if (error != null) { _uiState.update { it.copy(errorMessage = error) }; return }
         historyRequest++
+        caloriesEdited = false
         _uiState.update { it.copy(otherExercises = it.otherExercises + s.activeExercise(), exerciseName = "", sets = listOf(EditableSet(1)), previousSessionFound = false, overloadHint = null) }
     }
     fun removeSessionExercise(index: Int) { _uiState.update { it.copy(otherExercises = it.otherExercises.filterIndexed { i, _ -> i != index }) } }
@@ -145,6 +155,7 @@ class WorkoutViewModel(
         val s = _uiState.value; val row = s.otherExercises.getOrNull(index) ?: return
         if (s.exerciseName.isNotBlank()) { _uiState.update { it.copy(errorMessage = "Add the current exercise to the session before editing another.") }; return }
         historyRequest++
+        caloriesEdited = true // keep the figure already recorded for this exercise
         _uiState.update { it.copy(exerciseName = row.name, isCardio = row.cardio, sets = row.sets,
             durationMinutes = row.durationMinutes.toString(), estimatedCalories = row.calories.toString(),
             otherExercises = s.otherExercises.filterIndexed { i, _ -> i != index }) }
@@ -175,16 +186,29 @@ class WorkoutViewModel(
                 val rows = if (loaded.workout.exercisesJson != "[]") validateRoutinePayload(loaded.workout.exercisesJson)
                     else if (loaded.sets.isEmpty()) listOf(WorkoutExercise(loaded.workout.title, true, durationMinutes = loaded.workout.durationMinutes, calories = loaded.workout.estimatedCaloriesBurned))
                     else loaded.sets.groupBy { it.exerciseName }.entries.mapIndexed { index, (name, sets) -> WorkoutExercise(name, sets = sets.map { EditableSet(it.setNumber, it.weightKg.toString(), it.reps.toString(), it.isCompleted) }, durationMinutes = (loaded.workout.durationMinutes / loaded.sets.map { it.exerciseName }.distinct().size).coerceAtLeast(1), calories = if (index == 0) loaded.workout.estimatedCaloriesBurned else 0) }
+                val fitnessNames = setOf("Push-ups", "Sit-ups", "Crunches")
+                val isSimpleFitness = loaded.workout.title.equals("Daily fitness", ignoreCase = true) &&
+                    rows.isNotEmpty() &&
+                    rows.all { it.name in fitnessNames && !it.cardio && it.sets.size == 1 && (it.sets.single().weightKg.toFloatOrNull() ?: 0f) == 0f }
+                val fitnessDefaults = if (isSimpleFitness) {
+                    val byName = rows.associate { it.name to (it.sets.single().reps.toIntOrNull() ?: 0).toString() }
+                    val mins = rows.sumOf { it.durationMinutes }.coerceIn(3, 60).toString()
+                    val wt = weightForEstimate().let { if (it % 1.0 == 0.0) it.toInt().toString() else it.toString() }
+                    listOf(mins, wt, "MODERATE", byName["Push-ups"] ?: "0", byName["Sit-ups"] ?: "0", byName["Crunches"] ?: "0")
+                } else null
                 editLoaded = true
                 _uiState.update { it.copy(otherExercises = rows, exerciseName = "", sets = listOf(EditableSet(1)), timestamp = loaded.workout.timestamp,
-                    sessionTitle = loaded.workout.title, isLoading = false) }
+                    sessionTitle = loaded.workout.title, isLoading = false, isSimpleDailyFitness = isSimpleFitness, loadedDailyFitnessDefaults = fitnessDefaults) }
             } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
             catch (e: Exception) { _uiState.update { it.copy(isLoading = false, errorMessage = e.localizedMessage ?: "Could not load workout.") } }
         }
     }
 
     init {
-        if (workoutId == null) loadHistoryForExercise("Bench Press") else loadWorkout(workoutId)
+        if (workoutId == null) {
+            _uiState.update { it.copy(estimatedCalories = estimateFor(it)) }
+            loadHistoryForExercise("Bench Press")
+        } else loadWorkout(workoutId)
     }
 
     fun selectExercise(name: String) {
@@ -201,7 +225,7 @@ class WorkoutViewModel(
                 previousSessionFound = false,
                 overloadHint = null,
                 errorMessage = null
-            )
+            ).let { updated -> if (caloriesEdited) updated else updated.copy(estimatedCalories = estimateFor(updated)) }
         }
         loadHistoryForExercise(name)
     }
@@ -258,12 +282,7 @@ class WorkoutViewModel(
                 weightKg = lastSet?.weightKg ?: "",
                 reps = lastSet?.reps ?: ""
             )
-            val updatedSets = state.sets + newSet
-            val autoCals = calculateAutoCalories(updatedSets.size, state.durationMinutes.toIntOrNull() ?: 45)
-            state.copy(
-                sets = updatedSets,
-                estimatedCalories = autoCals.toString()
-            )
+            state.copy(sets = state.sets + newSet)
         }
     }
 
@@ -294,31 +313,21 @@ class WorkoutViewModel(
 
     fun updateDuration(duration: String) {
         _uiState.update { state ->
-            val d = duration.toIntOrNull() ?: 30
-            val autoCals = calculateAutoCalories(state.sets.size, d)
-            state.copy(
-                durationMinutes = duration,
-                estimatedCalories = autoCals.toString()
-            )
+            val updated = state.copy(durationMinutes = duration)
+            if (caloriesEdited) updated else updated.copy(estimatedCalories = estimateFor(updated))
         }
     }
 
     fun updateCalories(calories: String) {
+        caloriesEdited = true
         _uiState.update { it.copy(estimatedCalories = calories) }
     }
 
     fun toggleCardio(isCardio: Boolean) {
-        _uiState.update { it.copy(isCardio = isCardio) }
-    }
-
-    private fun calculateAutoCalories(setCount: Int, durationMins: Int): Int {
-        val name = _uiState.value.exerciseName
-        if (name in listOf("Push-ups", "Sit-ups", "Crunches", "Bodyweight Squats")) {
-            val met = if (name == "Crunches") 2.8 else 3.8
-            return kotlin.math.round(met * 3.5 * fitnessBodyWeight / 200 * durationMins.coerceAtLeast(0)).toInt()
+        _uiState.update { state ->
+            val updated = state.copy(isCardio = isCardio)
+            if (caloriesEdited) updated else updated.copy(estimatedCalories = estimateFor(updated))
         }
-        // Simple formula: ~5 kcal per heavy set + 3 kcal per min of training
-        return (setCount * 6) + (durationMins * 3)
     }
 
     fun saveWorkout(onSuccess: () -> Unit) {
@@ -358,12 +367,13 @@ class WorkoutViewModelFactory(
     private val workoutRepository: WorkoutRepository,
     private val personalDao: com.kalotracker.app.core.database.dao.PersonalDao,
     private val workoutId: String? = null,
-    private val initialTimestamp: Long = System.currentTimeMillis()
+    private val initialTimestamp: Long = System.currentTimeMillis(),
+    private val bodyWeightKg: () -> Double? = { null }
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(WorkoutViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return WorkoutViewModel(workoutRepository, personalDao, workoutId, initialTimestamp) as T
+            return WorkoutViewModel(workoutRepository, personalDao, workoutId, initialTimestamp, bodyWeightKg) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

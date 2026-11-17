@@ -31,10 +31,12 @@ class ReminderWorker(
             val today = LocalDate.now()
             val start = today.atStartOfDay(zone).toInstant().toEpochMilli()
             val end = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() - 1
-            val meals = KaloDatabase.getInstance(context).mealDao().getMealsForDayOnce(start, end)
+            val database = KaloDatabase.getInstance(context)
+            val meals = database.mealDao().getMealsForDayOnce(start, end)
+            val complete = database.personalDao().days().any { it.date == today.toString() && it.complete }
 
-            // Only nudge when the day looks under-logged.
-            if (meals.size < MIN_MEALS_BEFORE_SILENCE) notifyUser(meals.size)
+            // Match Settings: a meal-only nudge, never pressure to exercise on a rest day.
+            if (shouldRemindForMeals(meals.size, complete)) notifyUser()
         } finally {
             // Always queue tomorrow's reminder, even if today's check failed.
             ReminderScheduler.schedule(context, settings, replace = true)
@@ -42,7 +44,7 @@ class ReminderWorker(
         return Result.success()
     }
 
-    private fun notifyUser(mealCount: Int) {
+    private fun notifyUser() {
         val manager = NotificationManagerCompat.from(context)
         if (!manager.areNotificationsEnabled()) return
 
@@ -55,13 +57,11 @@ class ReminderWorker(
             context, 0, Intent(context, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val text = if (mealCount == 0) "Nothing logged today yet. Snap your meals while you remember them."
-        else "Only $mealCount meal logged today. Anything missing?"
-
+        // No counts or meal names: the lock screen may show this.
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Kalo")
-            .setContentText(text)
+            .setContentTitle("Want to add anything from today?")
+            .setContentText("Open your log when you're ready.")
             .setContentIntent(open)
             .setAutoCancel(true)
             .build()
@@ -75,6 +75,9 @@ class ReminderWorker(
     companion object {
         private const val CHANNEL_ID = "logging_reminders"
         private const val NOTIFICATION_ID = 1001
-        private const val MIN_MEALS_BEFORE_SILENCE = 2
     }
 }
+
+/** A reminder threshold is not evidence that intake is complete. */
+internal fun shouldRemindForMeals(mealCount: Int, dayComplete: Boolean): Boolean =
+    !dayComplete && mealCount < 2

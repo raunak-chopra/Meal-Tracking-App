@@ -112,7 +112,7 @@ object TrendAnalyzer {
     /** Plain-language observations, most useful first (max 4). Returns nothing when data is too thin. */
     fun insights(stats: TrendStats, targets: NutritionTargets): List<String> {
         if (stats.loggedDays < 3) {
-            return listOf("Log meals on at least 3 days to unlock trends. Right now there is not enough data to say anything reliable.")
+            return listOf("Mark at least 3 days complete to see patterns. Fewer days than that can't say much.")
         }
         val out = mutableListOf<String>()
         val logged = stats.days.filter { it.isLogged }
@@ -121,18 +121,18 @@ object TrendAnalyzer {
             val diff = stats.avgCalories - targets.calories
             when {
                 diff > targets.calories * 0.10f ->
-                    out += "You average ${stats.avgCalories} kcal on logged days, ${diff} over your ${targets.calories} target."
+                    out += "You average ${stats.avgCalories} kcal a day, ${diff} above your ${targets.calories} kcal target."
                 stats.avgCalories < targets.calories * 0.75f ->
-                    out += "You average only ${stats.avgCalories} kcal against a ${targets.calories} target. Either you are eating very little or some meals are not being logged."
+                    out += "You average ${stats.avgCalories} kcal against a ${targets.calories} kcal target. If that seems low, some meals may be missing from the log."
             }
         }
 
         val proteinRate = stats.proteinHitDays.toFloat() / stats.loggedDays
         if (targets.protein > 0) {
             if (proteinRate < 0.5f) {
-                out += "Protein was on target on ${stats.proteinHitDays} of ${stats.loggedDays} logged days (average ${stats.avgProtein}g vs ${targets.protein}g). Adding a protein source to your lightest meal is the easiest fix."
+                out += "Protein was on target on ${stats.proteinHitDays} of ${stats.loggedDays} days (average ${stats.avgProtein} g of ${targets.protein} g). A protein source in your lightest meal is the simplest change."
             } else if (proteinRate >= 0.8f) {
-                out += "Strong protein consistency: on target ${stats.proteinHitDays} of ${stats.loggedDays} logged days."
+                out += "Protein was on target on ${stats.proteinHitDays} of ${stats.loggedDays} days."
             }
         }
 
@@ -156,7 +156,7 @@ object TrendAnalyzer {
             out += "Water averages ${stats.avgWaterMl} ml a day against a ${targets.waterMl} ml goal."
         }
 
-        if (out.isEmpty()) out += "Nothing stands out. Calories, protein and timing are all close to your targets."
+        if (out.isEmpty()) out += "Nothing stands out. Calories, protein and timing are close to your targets."
         return out.take(4)
     }
 }
@@ -173,7 +173,8 @@ data class GoalSuggestion(val message: String, val newCalorieTarget: Int? = null
 
 object GoalAdvisor {
 
-    fun withEvidence(goal: GoalType, points: List<WeightPoint>, days: List<DayTotals>, currentTarget: Int): GoalSuggestion {
+    fun withEvidence(goal: GoalType, points: List<WeightPoint>, days: List<DayTotals>, currentTarget: Int,
+                     minimumCalorieTarget: Int = 1200): GoalSuggestion {
         val complete = days.filter { it.complete && it.isLogged }
         if (complete.size < 10) return GoalSuggestion("Mark at least 10 fully logged past days complete before adjusting your target.")
         if (complete.any { it.historicalTargets == null } || complete.map { it.historicalTargets }.distinct().size > 1)
@@ -182,7 +183,7 @@ object GoalAdvisor {
         if (onTarget < complete.size * 0.7f) return GoalSuggestion("Your logged intake varies from your target. Review consistency before changing the target.")
         val start = complete.minOf { it.date }.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val end = complete.maxOf { it.date }.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        return suggest(goal, weeklyChangeKg(points.filter { it.epochMillis in start until end }), currentTarget)
+        return suggest(goal, weeklyChangeKg(points.filter { it.epochMillis in start until end }), currentTarget, minimumCalorieTarget)
     }
 
     private const val MIN_SPAN_DAYS = 10
@@ -206,14 +207,17 @@ object GoalAdvisor {
         return slope.toFloat()
     }
 
-    fun suggest(goal: GoalType, weeklyChangeKg: Float?, currentTarget: Int): GoalSuggestion {
+    fun suggest(goal: GoalType, weeklyChangeKg: Float?, currentTarget: Int, minimumCalorieTarget: Int = 1200): GoalSuggestion {
+        require(minimumCalorieTarget in 1200..5000)
         if (weeklyChangeKg == null) {
             return GoalSuggestion("Log your weight a few times over at least ${MIN_SPAN_DAYS} days to get a calorie-target check.")
         }
         val rate = String.format(java.util.Locale.US, "%+.2f", weeklyChangeKg)
         fun adjust(delta: Int, why: String): GoalSuggestion {
-            val target = (currentTarget + delta).coerceIn(1200, 5000)
-            return GoalSuggestion("Your weight is trending $rate kg/week. $why Try $target kcal/day (${if (delta > 0) "+" else ""}$delta).", target)
+            val target = (currentTarget + delta).coerceIn(minimumCalorieTarget, 5000)
+            if (target == currentTarget) return GoalSuggestion("Your weight is trending $rate kg/week. Your current target is at the formula's lower limit; review your goals with a qualified professional before reducing it.")
+            val actualDelta = target - currentTarget
+            return GoalSuggestion("Your weight is trending $rate kg/week. $why Review $target kcal/day (${if (actualDelta > 0) "+" else ""}$actualDelta).", target)
         }
         return when (goal) {
             GoalType.LOSE -> when {

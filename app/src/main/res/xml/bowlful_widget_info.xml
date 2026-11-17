@@ -8,6 +8,6 @@
     android:maxResizeHeight="300dp"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"
-    android:previewImage="@drawable/kalo_widget_preview"
+    android:previewImage="@drawable/bowlful_widget_preview"
     android:initialLayout="@layout/glance_default_loading_layout"
     android:description="@string/widget_description" />

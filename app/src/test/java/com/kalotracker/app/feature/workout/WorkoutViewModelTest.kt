@@ -156,8 +156,48 @@ class WorkoutViewModelTest {
         } finally { holder.clear(); runCurrent(); Dispatchers.resetMain() }
     }
 
+    @Test fun editingSavedDailyFitnessLoadsSimpleQuickFitnessDefaultsAndUpdatesExistingWorkout() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        val dao = FakeWorkoutDao()
+        val initialExercises = dailyFitnessExercises(7, 70.0, FitnessEffort.MODERATE, listOf(25, 0, 30))
+        dao.existingWorkout = WorkoutWithSets(
+            WorkoutEntity(
+                id = "df-1",
+                title = "Daily fitness",
+                type = "STRENGTH",
+                durationMinutes = 7,
+                estimatedCaloriesBurned = initialExercises.sumOf { it.calories },
+                timestamp = 1000L,
+                exercisesJson = com.kalotracker.app.core.data.food.PersonalFood.json.encodeToString(
+                    kotlinx.serialization.builtins.ListSerializer(WorkoutExercise.serializer()),
+                    initialExercises
+                )
+            ),
+            listOf(
+                ExerciseSetEntity(workoutId = "df-1", exerciseName = "Push-ups", setNumber = 1, weightKg = 0f, reps = 25),
+                ExerciseSetEntity(workoutId = "df-1", exerciseName = "Crunches", setNumber = 1, weightKg = 0f, reps = 30)
+            )
+        )
+        val vm = WorkoutViewModel(WorkoutRepository(dao, dispatcher), workoutId = "df-1", bodyWeightKg = { 72.0 })
+        val holder = androidx.lifecycle.ViewModelStore().apply { put("edit_df", vm) }
+        try {
+            runCurrent()
+            assertTrue(vm.uiState.value.isSimpleDailyFitness)
+            assertEquals(listOf("7", "72", "MODERATE", "25", "0", "30"), vm.uiState.value.loadedDailyFitnessDefaults)
+            var saved = 0
+            vm.saveDailyFitness("10", "72", FitnessEffort.HARD, listOf("30", "20", "30")) { saved++ }
+            runCurrent()
+            assertEquals(1, saved)
+            assertEquals("df-1", dao.savedWorkout!!.id)
+            assertEquals(10, dao.savedWorkout!!.durationMinutes)
+            assertEquals(listOf(30, 20, 30), dao.savedSets.map { it.reps })
+        } finally { holder.clear(); runCurrent(); Dispatchers.resetMain() }
+    }
+
     private class FakeWorkoutDao : WorkoutDao {
         val histories = mutableMapOf<String, CompletableDeferred<List<ExerciseSetEntity>>>()
+        var existingWorkout: WorkoutWithSets? = null
         var savedWorkout: WorkoutEntity? = null
         var writes = 0
         var failWrites = false
@@ -170,9 +210,13 @@ class WorkoutViewModelTest {
             savedWorkout = workout
             savedSets = sets
         }
-        override suspend fun getWorkoutById(id: String): WorkoutWithSets? = null
+        override suspend fun replaceWorkoutWithSets(workout: WorkoutEntity, sets: List<ExerciseSetEntity>) {
+            insertWorkoutWithSets(workout, sets)
+        }
+        override suspend fun getWorkoutById(id: String): WorkoutWithSets? = existingWorkout?.takeIf { it.workout.id == id }
         override fun getWorkoutsForDay(startOfDay: Long, endOfDay: Long) = flowOf(emptyList<WorkoutWithSets>())
         override suspend fun getWorkoutsBetween(start: Long, end: Long) = emptyList<WorkoutWithSets>()
+        override suspend fun getRecentWorkouts(limit: Int) = emptyList<WorkoutWithSets>()
         override suspend fun getAllWorkouts() = emptyList<WorkoutWithSets>()
         override suspend fun insertWorkout(workout: WorkoutEntity) = Unit
         override suspend fun insertWorkouts(workouts: List<WorkoutEntity>) = Unit

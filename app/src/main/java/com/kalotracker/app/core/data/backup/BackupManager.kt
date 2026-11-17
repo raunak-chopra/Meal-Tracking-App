@@ -17,7 +17,7 @@ class BackupManager(
     private val profileRepository: UserProfileRepository,
     private val photosDir: File,
     private val settings: com.kalotracker.app.core.settings.AppSettings,
-    private val draftFile: File? = null
+    private val draftFiles: List<File> = emptyList()
 ) {
 
     suspend fun buildBackup(): BackupFile = withContext(Dispatchers.IO) {
@@ -26,7 +26,8 @@ class BackupManager(
             BackupFile(
                 profile = BackupProfile(
                     calories = p.targetCalories, protein = p.targetProtein, carbs = p.targetCarbs,
-                    fat = p.targetFat, steps = p.targetSteps, waterMl = p.targetWaterMl, goal = p.goal.name
+                    fat = p.targetFat, steps = p.targetSteps, waterMl = p.targetWaterMl, goal = p.goal.name,
+                    body = profileRepository.body.value?.let(BackupBody::from)
                 ),
                 meals = database.mealDao().getAllMeals().map { BackupCodec.toBackupMeal(it.meal, it.items) },
                 workouts = database.workoutDao().getAllWorkouts().map { BackupCodec.toBackupWorkout(it.workout, it.sets) },
@@ -67,6 +68,7 @@ class BackupManager(
         file.profile?.let {
             profileRepository.updateTargets(it.calories, it.protein, it.carbs, it.fat, it.steps, it.waterMl)
             runCatching { GoalType.valueOf(it.goal) }.getOrNull()?.let(profileRepository::setGoal)
+            it.body?.toBodyProfile()?.let(profileRepository::saveBody)
         }
         profileRepository.restoreHistory(file.goalHistory)
         file.preferences?.let { p ->
@@ -116,7 +118,7 @@ class BackupManager(
             database.weightDao().deleteAll()
             database.personalDao().apply { clearDays(); clearGoals(); clearFoods(); clearBarcodes(); clearRoutines() }
         }
-        draftFile?.let { android.util.AtomicFile(it).delete() }
+        draftFiles.forEach { android.util.AtomicFile(it).delete() }
         profileRepository.resetHistory()
         photosDir.listFiles()?.forEach { runCatching { it.delete() } }
     }

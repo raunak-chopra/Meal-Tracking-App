@@ -28,12 +28,12 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Kalo">
+        android:theme="@style/Theme.Bowlful">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.Kalo"
+            android:theme="@style/Theme.Bowlful"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -78,7 +78,7 @@
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/kalo_widget_info" />
+                android:resource="@xml/bowlful_widget_info" />
         </receiver>
 
     </application>

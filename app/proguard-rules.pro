@@ -1,4 +1,4 @@
-# Kalo ProGuard Configuration
+# Bowlful ProGuard Configuration
 
 # Kotlinx Serialization
 -keepattributes *Annotation*,InnerClasses

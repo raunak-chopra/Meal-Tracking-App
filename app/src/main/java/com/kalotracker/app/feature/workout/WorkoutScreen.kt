@@ -44,11 +44,13 @@ fun WorkoutScreen(
     val state by viewModel.uiState.collectAsState()
     androidx.activity.compose.BackHandler(enabled = state.isSaving) {}
     val routines by viewModel.routines.collectAsState()
-    var detailed by rememberSaveable { mutableStateOf(!quickFitness) }
+    val useQuickByDefault = quickFitness || state.isSimpleDailyFitness
+    var detailed by rememberSaveable(state.isSimpleDailyFitness) { mutableStateOf(!useQuickByDefault) }
+    val effectiveFitnessDefaults = state.loadedDailyFitnessDefaults ?: fitnessDefaults
     val quickStateHolder = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
-    if (!detailed) {
+    if (!detailed && !state.isLoading) {
         quickStateHolder.SaveableStateProvider("quickFitness") {
-        DailyFitnessScreen(state, fitnessDefaults, onClose, { detailed = true }, viewModel::setTimestamp) { minutes, weight, effort, reps ->
+        DailyFitnessScreen(state, effectiveFitnessDefaults, onClose, { detailed = true }, viewModel::setTimestamp) { minutes, weight, effort, reps ->
             viewModel.saveDailyFitness(minutes, weight, effort, reps) {
                 onFitnessDefaultsSaved(listOf(minutes, weight, effort.name) + reps)
                 onWorkoutSaved()
@@ -89,9 +91,9 @@ fun WorkoutScreen(
                 }
 
                 Text(
-                    text = "LOG SESSION",
-                    style = KaloTypography.labelSmall,
-                    color = KaloTextSecondary
+                    text = "Log session",
+                    style = KaloTypography.titleMedium,
+                    color = KaloTextPrimary
                 )
 
                 Box(modifier = Modifier.size(48.dp))
@@ -124,11 +126,11 @@ fun WorkoutScreen(
             state.errorMessage?.let { message ->
                 item { Text(message, color = MaterialTheme.colorScheme.error) }
             }
-            if (quickFitness) item { TextButton(onClick = { detailed = false }, enabled = !state.isSaving) { Text("Back to quick daily fitness") } }
+            if (useQuickByDefault) item { TextButton(onClick = { detailed = false }, enabled = !state.isSaving) { Text("Back to quick daily fitness") } }
             item {
                 Surface(shape = RoundedCornerShape(16.dp), color = KaloSurfaceElevated) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("DAILY FITNESS", style = KaloTypography.labelSmall, color = KaloProtein)
+                        Text("Daily fitness", style = KaloTypography.titleMedium, color = KaloTextPrimary)
                         Text("20 push-ups · 20 sit-ups · 20 crunches", color = KaloTextPrimary)
                         Text("A quick 5–10 minute log. Change reps or remove exercises below after loading.", color = KaloTextSecondary)
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -152,7 +154,7 @@ fun WorkoutScreen(
             item { Row {
                 TextButton(onClick = viewModel::saveRoutine, enabled = !state.isSaving) { Text("Save routine") }
                 TextButton(onClick = { viewModel.startRest() }) { Text("90s rest") }
-                if (state.restSeconds > 0) TextButton(onClick = viewModel::stopRest) { Text("${state.restSeconds}s Ã‚Â· Stop") }
+                if (state.restSeconds > 0) TextButton(onClick = viewModel::stopRest) { Text("${state.restSeconds}s · Stop") }
             } }
             items(routines, key = { "routine" + it.id }) { routine -> Row {
                 TextButton(onClick = { viewModel.loadRoutine(routine) }, enabled = !state.isSaving) { Text("Load ${routine.name}") }
@@ -168,9 +170,9 @@ fun WorkoutScreen(
             item {
                 Column {
                     Text(
-                        text = "POPULAR EXERCISES",
-                        style = KaloTypography.labelSmall,
-                        color = KaloTextSecondary
+                        text = "Popular exercises",
+                        style = KaloTypography.titleMedium,
+                        color = KaloTextPrimary
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     LazyRow(

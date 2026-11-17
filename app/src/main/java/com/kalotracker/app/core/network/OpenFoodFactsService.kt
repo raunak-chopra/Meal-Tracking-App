@@ -21,9 +21,11 @@ data class ScannedFoodProduct(
     val fromCache: Boolean = false,
     val labelUrl: String? = null,
     val requiresLabelConfirmation: Boolean = false,
-    val fromCatalog: Boolean = false
+    val fromCatalog: Boolean = false,
+    /** "ml" for drinks sold by volume (values are then per 100 ml), otherwise "g". */
+    val unit: String = "g"
 ) {
-    fun calculateCalories(grams: Float): Int = ((caloriesPer100g * grams) / 100f).toInt()
+    fun calculateCalories(grams: Float): Int = kotlin.math.round((caloriesPer100g * grams) / 100f).toInt()
     fun calculateProtein(grams: Float): Float = (proteinPer100g * grams) / 100f
     fun calculateCarbs(grams: Float): Float = (carbsPer100g * grams) / 100f
     fun calculateFat(grams: Float): Float = (fatPer100g * grams) / 100f
@@ -98,6 +100,18 @@ class OpenFoodFactsService(private val cache: com.kalotracker.app.core.database.
         }
 
     companion object {
+        /** Open Food Facts states the serving unit; drinks are also recognisable from "nutrition per 100ml". */
+        internal fun productUnit(product: JSONObject): String {
+            val servingUnit = product.optString("serving_quantity_unit").trim().lowercase()
+            val per = product.optString("nutrition_data_per").trim().lowercase()
+            val quantity = product.optString("quantity").trim().lowercase()
+            return when {
+                servingUnit == "ml" || per == "100ml" -> "ml"
+                servingUnit.isEmpty() && Regex("""\d\s*(ml|cl|l)\b""").containsMatchIn(quantity) -> "ml"
+                else -> "g"
+            }
+        }
+
         /** Pure parser (unit tested). Never fabricates data: missing calories is an error. */
         internal fun parseProduct(barcode: String, json: JSONObject): Result<ScannedFoodProduct> {
             if (json.optInt("status", 0) != 1 || !json.has("product")) {
@@ -128,11 +142,12 @@ class OpenFoodFactsService(private val cache: com.kalotracker.app.core.database.
                     name = name,
                     brand = product.optString("brands", "").ifBlank { null },
                     servingSizeGrams = serving,
-                    caloriesPer100g = kcal.toInt(),
+                    caloriesPer100g = kotlin.math.round(kcal).toInt(),
                     proteinPer100g = nutriments.optDouble("proteins_100g", 0.0).toFloat(),
                     carbsPer100g = nutriments.optDouble("carbohydrates_100g", 0.0).toFloat(),
                     fatPer100g = nutriments.optDouble("fat_100g", 0.0).toFloat(),
-                    imageUrl = product.optString("image_url", "").ifBlank { null }
+                    imageUrl = product.optString("image_url", "").ifBlank { null },
+                    unit = productUnit(product)
                 )
             )
         }

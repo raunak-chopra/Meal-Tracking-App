@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,6 +51,7 @@ fun CameraScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
     val state by viewModel.uiState.collectAsState()
+    val unfinished by viewModel.unfinished.collectAsState()
     androidx.activity.compose.BackHandler(enabled = state.isSaving) {}
 
     var imageCapture: ImageCapture? by remember { mutableStateOf(null) }
@@ -69,7 +71,7 @@ fun CameraScreen(
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted -> hasCameraPermission = granted }
-    var showFoodSearch by remember { mutableStateOf(false) }
+    var showFoodSearch by rememberSaveable { mutableStateOf(false) }
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -79,10 +81,6 @@ fun CameraScreen(
         }
     }
 
-    if (state.resumePending) AlertDialog(onDismissRequest = {},
-        title = { Text("Resume your meal?") }, text = { Text("Your unfinished photo meal is still here, including its original date and corrections.") },
-        confirmButton = { TextButton(onClick = viewModel::resumeDraft) { Text("Resume") } },
-        dismissButton = { TextButton(onClick = viewModel::resetScan) { Text("Discard") } })
     if (state.draftLoading) {
         Box(Modifier.fillMaxSize().background(KaloBackground), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         return
@@ -164,13 +162,32 @@ fun CameraScreen(
                 )
             }
 
-            Text(
-                text = "FRAME MEAL",
-                style = KaloTypography.labelSmall,
-                color = Color.White
-            )
-
-            Box(modifier = Modifier.size(44.dp))
+            // Earlier unfinished meal: offered quietly, never in the way of a new photo.
+            val earlier = unfinished
+            if (earlier != null && state.isEmpty) {
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = Color.Black.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(start = 12.dp).weight(1f, fill = false)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 16.dp)) {
+                        Text(
+                            text = "${earlier.title} · ${earlier.calories} kcal",
+                            style = KaloTypography.bodyMedium,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        TextButton(onClick = viewModel::resumeDraft) { Text("Resume", color = Color.White) }
+                        IconButton(onClick = viewModel::discardUnfinished) {
+                            Icon(Icons.Default.Close, contentDescription = "Discard unfinished meal", tint = Color.White.copy(alpha = 0.8f))
+                        }
+                    }
+                }
+            } else {
+                Box(modifier = Modifier.size(44.dp))
+            }
         }
 
         // Shutter & Pre-Modifiers Controls at the Bottom
@@ -185,27 +202,39 @@ fun CameraScreen(
             if (!state.errorMessage.isNullOrBlank()) {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = KaloFat.copy(alpha = 0.92f),
+                    color = KaloSurface,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
                         Text(
                             text = state.errorMessage ?: "",
                             style = KaloTypography.bodyMedium,
-                            color = Color.White
+                            color = KaloTextPrimary
                         )
                         if (state.canRetry) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 TextButton(onClick = { viewModel.retryAnalysis() }) {
-                                    Text("Retry", color = Color.White)
+                                    Text("Try again")
                                 }
                                 TextButton(onClick = onOpenSettings) {
-                                    Text("Settings", color = Color.White)
+                                    Text("Settings")
                                 }
                             }
                         }
                     }
                 }
+            }
+
+            if (state.errorMessage.isNullOrBlank()) {
+                Text(
+                    text = if (state.isAnalyzing) "Reading your photo…" else "Keep the whole meal in view.",
+                    style = KaloTypography.bodyMedium,
+                    color = Color.White,
+                    modifier = Modifier
+                        .padding(bottom = 12.dp)
+                        .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                )
             }
 
             // Quick modifier chip
@@ -220,7 +249,7 @@ fun CameraScreen(
                 modifier = Modifier.padding(bottom = 24.dp)
             ) {
                 Text(
-                    text = if (state.hasAddedOil) "✓ Cooked with Oil / Butter (+120 kcal)" else "+ Cooked with Oil / Butter",
+                    text = "Cooked in oil or butter",
                     style = KaloTypography.bodyMedium,
                     color = if (state.hasAddedOil) Color.Black else Color.White,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -307,7 +336,7 @@ fun CameraScreen(
 
         // Meal Review Sheet when items are detected
         AnimatedVisibility(
-            visible = state.items.isNotEmpty() && !state.resumePending,
+            visible = state.items.isNotEmpty(),
             enter = fadeIn(),
             exit = fadeOut()
         ) {
@@ -318,8 +347,10 @@ fun CameraScreen(
                     onScaleMeal = viewModel::scaleMeal,
                     onCookingFatChange = viewModel::setCookingFat,
                     onNutritionChange = viewModel::correctNutrition,
+                    onKeepNutrition = viewModel::keepItemNutrition,
                     onNameChange = viewModel::setItemName,
-                    onGramsChange = viewModel::setItemGrams,
+                    onReestimateItem = viewModel::reestimateItem,
+                    onAmountInputChange = viewModel::setItemAmountInput,
                     onRemoveItem = viewModel::removeItem,
                     onAddFood = { showFoodSearch = true },
                     onNoteChange = viewModel::setUserNote,

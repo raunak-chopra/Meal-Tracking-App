@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Kalo"
+rootProject.name = "Bowlful"
 include(":app")

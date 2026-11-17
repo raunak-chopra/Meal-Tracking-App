@@ -66,7 +66,7 @@ class TrendAnalyzerTest {
         val meals = (0..4).map { meal(monday.plusDays(it.toLong()), 12, 2600, 70f) }
         val d = days(monday, monday.plusDays(6), meals)
         val insights = TrendAnalyzer.insights(TrendAnalyzer.stats(d, targets, monday.plusDays(6)), targets)
-        assertTrue(insights.any { it.contains("over your 2000") })
+        assertTrue(insights.any { it.contains("above your 2000") })
         assertTrue(insights.any { it.contains("Protein was on target on 0 of 5") })
     }
 
@@ -87,8 +87,8 @@ class TrendAnalyzerTest {
         val meals = (0..4).map { meal(monday.plusDays(it.toLong()), 12, 2000, 150f) }
         val d = days(monday, monday.plusDays(6), meals)
         val insights = TrendAnalyzer.insights(TrendAnalyzer.stats(d, targets, monday.plusDays(6)), targets)
-        assertTrue(insights.any { it.contains("Strong protein consistency") })
-        assertTrue(insights.none { it.contains("over your") })
+        assertTrue(insights.any { it.contains("Protein was on target on") })
+        assertTrue(insights.none { it.contains("above your") })
     }
 
     private fun weights(vararg pairs: Pair<Int, Float>) =

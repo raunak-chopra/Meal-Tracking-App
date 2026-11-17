@@ -43,6 +43,28 @@ class MigrationTest {
         }
     }
 
+    @Test fun migration4to5_keepsFoodItemsAsGramsAndMatchesSchema() {
+        open().use { old ->
+            old.exec("PRAGMA foreign_keys=ON")
+            schemaSql(4).forEach { old.exec(it) }
+            old.exec("INSERT INTO meals VALUES ('m','Rice',200,4,45,0.5,'/photo.jpg','note',1000)")
+            old.exec("INSERT INTO food_items VALUES ('f','m','Rice',150,200,4,45,0.5,1)")
+            Migrations.MIGRATION_4_5_SQL.forEach { old.exec(it) }
+            old.createStatement().use { st -> st.executeQuery("SELECT unit, portionGrams FROM food_items").use {
+                it.next(); assertEquals("g", it.getString(1)); assertEquals(150.0, it.getDouble(2), 0.0)
+            } }
+            open().use { fresh ->
+                schemaSql(5).forEach { fresh.exec(it) }
+                assertEquals(fresh.tables(), old.tables())
+                for (table in fresh.tables()) {
+                    assertEquals(table, fresh.columns(table), old.columns(table))
+                    assertEquals(table, fresh.foreignKeys(table), old.foreignKeys(table))
+                    assertEquals(table, fresh.indexes(table), old.indexes(table))
+                }
+            }
+        }
+    }
+
     private fun schemaSql(version: Int): List<String> {
         val path = "/com.kalotracker.app.core.database.KaloDatabase/$version.json"
         val text = javaClass.getResourceAsStream(path)!!.bufferedReader().readText()

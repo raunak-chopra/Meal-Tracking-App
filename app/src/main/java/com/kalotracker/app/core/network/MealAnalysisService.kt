@@ -21,6 +21,7 @@ import java.net.URL
 
 /** Talks to the Gemini API directly using the user's own key. No server involved. */
 open class MealAnalysisService(private val settingsProvider: () -> AiSettings) {
+    val isConfigured: Boolean get() = settingsProvider().isConfigured
 
     open suspend fun analyzeMealImage(
         imageBytes: ByteArray,
@@ -44,7 +45,33 @@ open class MealAnalysisService(private val settingsProvider: () -> AiSettings) {
         }
     }
 
-    /** Lightweight key/model check used by the Settings "Test" button. */
+    /**
+     * Estimates a meal the user describes in words, e.g. "chicken bharta and 2 rotis".
+     * Dish names are taken as written, so a typed "chicken bharta" is never read as paneer.
+     */
+    open suspend fun analyzeMealText(description: String): Result<MealAnalysisResponse> = withContext(Dispatchers.IO) {
+        val settings = settingsProvider()
+        if (!settings.isConfigured) return@withContext Result.failure(MealAnalysisException.NotConfigured())
+        val text = description.trim().take(MAX_DESCRIPTION)
+        if (text.isEmpty()) return@withContext Result.failure(MealAnalysisException.NotFood(NOT_FOOD_TEXT))
+
+        try {
+            val raw = post(settings, buildTextRequest(text).toString())
+            Result.success(parseGeminiResponse(JSON, raw))
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (e: MealAnalysisException.NotFood) {
+            Result.failure(MealAnalysisException.NotFood(NOT_FOOD_TEXT))
+        } catch (e: MealAnalysisException) {
+            Result.failure(e)
+        } catch (e: IOException) {
+            Result.failure(MealAnalysisException.Offline())
+        } catch (e: Exception) {
+            Result.failure(MealAnalysisException.Other(e.localizedMessage ?: "Estimate failed"))
+        }
+    }
+
+    /** Lightweight key/model check used by the Settings "Test" button. Each configured key is tried in turn. */
     suspend fun testConnection(settings: AiSettings): Result<Unit> = withContext(Dispatchers.IO) {
         if (!settings.isConfigured) return@withContext Result.failure(MealAnalysisException.NotConfigured())
         try {
@@ -111,7 +138,8 @@ open class MealAnalysisService(private val settingsProvider: () -> AiSettings) {
                         put("text", buildString {
                             append("Analyze this meal photo.")
                             if (!userNote.isNullOrBlank()) {
-                                append(" The user says: \"").append(userNote.trim().take(300)).append("\".")
+                                append(" The user's correction: \"").append(userNote.trim().take(300)).append("\".")
+                                append(" Treat it as fact: use the dishes, ingredients and quantities they name even where the photo looks different.")
                             }
                         })
                     })
@@ -131,8 +159,46 @@ open class MealAnalysisService(private val settingsProvider: () -> AiSettings) {
         })
     }
 
+    private fun buildTextRequest(description: String): JsonObject = buildJsonObject {
+        put("system_instruction", buildJsonObject {
+            put("parts", buildJsonArray { add(buildJsonObject { put("text", TEXT_SYSTEM_PROMPT) }) })
+        })
+        put("contents", buildJsonArray {
+            add(buildJsonObject {
+                put("parts", buildJsonArray {
+                    add(buildJsonObject { put("text", "What I ate: \"$description\"") })
+                })
+            })
+        })
+        put("generationConfig", buildJsonObject {
+            put("response_mime_type", "application/json")
+            put("response_schema", RESPONSE_SCHEMA)
+            put("temperature", 0.2)
+        })
+    }
+
+    /**
+     * Sends with the main key, then the backup key if the main one is rejected, rate-limited,
+     * unreachable or the server fails. Malformed responses are not retried with another key.
+     */
     private fun post(settings: AiSettings, body: String): String {
-        val url = "$BASE/models/${settings.model}:generateContent"
+        var lastError: Exception? = null
+        for (key in settings.keys) {
+            try {
+                return postWithKey(settings.model, key, body)
+            } catch (e: MealAnalysisException.BadResponse) {
+                throw e
+            } catch (e: MealAnalysisException) {
+                lastError = e
+            } catch (e: IOException) {
+                lastError = e
+            }
+        }
+        throw lastError ?: MealAnalysisException.NotConfigured()
+    }
+
+    internal open fun postWithKey(model: String, apiKey: String, body: String): String {
+        val url = "$BASE/models/$model:generateContent"
         val conn = URL(url).openConnection() as HttpURLConnection
         try {
             conn.requestMethod = "POST"
@@ -140,7 +206,7 @@ open class MealAnalysisService(private val settingsProvider: () -> AiSettings) {
             conn.readTimeout = 60_000
             conn.doOutput = true
             conn.setRequestProperty("Content-Type", "application/json")
-            conn.setRequestProperty("x-goog-api-key", settings.apiKey)
+            conn.setRequestProperty("x-goog-api-key", apiKey)
             conn.outputStream.use { it.write(body.toByteArray()) }
 
             val code = conn.responseCode
@@ -168,11 +234,27 @@ open class MealAnalysisService(private val settingsProvider: () -> AiSettings) {
         private const val SYSTEM_PROMPT = """You are a careful nutrition analyst. Look at the meal photo and list each distinguishable food.
 Rules:
 1. Set is_food=false (and items=[]) if the photo does not show food or drink.
-2. Estimate each item's edible weight in grams from visual cues (plate size, cutlery, typical servings). Prefer realistic servings; do not inflate.
-3. Give calories and macros for THAT weight using standard USDA-style values.
+2. Estimate each item's amount from visual cues (plate size, cutlery, glass size, typical servings). Prefer realistic servings; do not inflate.
+   Use unit "ml" for drinks and pourable liquids (water, milk, juice, tea, coffee, lassi, soup, dal served as a drink). Use unit "g" for everything else.
+   portion_grams holds the amount in that unit (millilitres when unit is "ml").
+3. Give calories and macros for THAT amount using standard USDA-style values.
 4. Include a plausible modest allowance for cooking fats and sauces within the dish nutrition when preparation suggests them. Do not count them again as separate items unless visibly separate or the user explicitly describes an extra amount. State important assumptions.
 5. confidence is 0.0-1.0 for the whole meal; lower it for blurry photos, mixed dishes or hidden ingredients.
 6. estimation_notes: one short sentence naming the main assumption, including raw/cooked preparation or cooking fat when relevant. Aim for a useful everyday estimate; never require the user to weigh food. Follow the user note for quantities and food corrections."""
+
+        private const val MAX_DESCRIPTION = 500
+        private const val NOT_FOOD_TEXT = "Couldn't find a food in that description. Name the dish, e.g. \"chicken bharta and 2 rotis\"."
+
+        private const val TEXT_SYSTEM_PROMPT = """You are a careful nutrition analyst. The user describes what they ate in their own words; list each food they mention.
+Rules:
+1. Use the dish and ingredient names exactly as the user wrote them. Never swap a named protein or dish for a similar one
+   (chicken bharta is chicken, not paneer; egg curry is not chicken curry). Fix only obvious spelling slips. Regional and Indian dishes are common.
+2. Use any amounts the user gives (grams, ml, pieces, bowls, cups, rotis, plates). Otherwise assume one typical home serving. Do not inflate.
+   Use unit "ml" for drinks and pourable liquids, "g" for everything else. portion_grams holds the amount in that unit.
+3. Give calories and macros for THAT amount using standard USDA/IFCT-style values, including typical home cooking oil inside the dish.
+4. Set is_food=false (and items=[]) only if the text names no food or drink.
+5. confidence is 0.0-1.0; lower it when amounts or recipes are vague.
+6. meal_title: a short name built from the user's words. estimation_notes: one short sentence naming the main assumption (serving size, oil, recipe)."""
 
         private fun type(name: String) = buildJsonObject { put("type", name) }
 
@@ -195,6 +277,10 @@ Rules:
                             put("carbs", type("NUMBER"))
                             put("fat", type("NUMBER"))
                             put("confidence", type("NUMBER"))
+                            put("unit", buildJsonObject {
+                                put("type", "STRING")
+                                put("enum", buildJsonArray { add(JsonPrimitive("g")); add(JsonPrimitive("ml")) })
+                            })
                         })
                         put("required", required("name", "portion_grams", "calories", "protein", "carbs", "fat"))
                     })
@@ -232,6 +318,8 @@ internal fun parseGeminiResponse(json: Json, raw: String): MealAnalysisResponse 
 
     if (!parsed.isFood) throw MealAnalysisException.NotFood()
 
+    if (parsed.items.size > 100) throw MealAnalysisException.BadResponse("too many foods; split this into smaller meals")
+    if (parsed.items.isEmpty()) throw MealAnalysisException.NotFood()
     val valid = parsed.items.filter {
         it.name.isNotBlank() &&
             it.portionGrams.isFinite() && it.portionGrams in 1f..5000f &&
@@ -239,9 +327,12 @@ internal fun parseGeminiResponse(json: Json, raw: String): MealAnalysisResponse 
             it.protein.isFinite() && it.protein in 0f..5000f &&
             it.carbs.isFinite() && it.carbs in 0f..5000f &&
             it.fat.isFinite() && it.fat in 0f..5000f
-    }.take(100).map { it.copy(confidence = if (it.confidence.isFinite()) it.confidence.coerceIn(0f, 1f) else 0f) }
+    }.map {
+        it.copy(confidence = if (it.confidence.isFinite()) it.confidence.coerceIn(0f, 1f) else 0f, unit = portionUnit(it.unit))
+    }
 
-    if (valid.isEmpty()) throw MealAnalysisException.NotFood()
+    // Never silently remove part of a meal and present the remainder as a complete estimate.
+    if (valid.size != parsed.items.size) throw MealAnalysisException.BadResponse("some foods had invalid nutrition; retry or enter those foods manually")
 
     return parsed.copy(items = valid, confidence = parsed.confidence.coerceIn(0f, 1f))
 }
